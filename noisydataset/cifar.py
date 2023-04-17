@@ -121,7 +121,7 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
         self.targets_gt = self.targets.copy()
         eye = np.eye(self.num_classes, dtype=np.int32)
         in_dist = eye[self.targets_gt] # one-hot encoding
-        out_dist = in_dist @ transition_matrix.T
+        out_dist = in_dist @ transition_matrix
         self.targets = self.rng_generator.choice(np.arange(len(out_dist)), p=out_dist)
         pass
 
