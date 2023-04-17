@@ -98,29 +98,25 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
         self.targets = np.array(self.targets)
         self.noise_rate = noise_rate
         self.random_state = random_state
+        self.rng_generator = np.random.default_rng(self.random_state)
 
         if noise_type == "symmetric":
             self._inject_symmetric_noise()
         elif noise_type == "asymmetric":
             self._inject_asymmetric_noise()
 
-    def _build_transition_matrix(self):
-        eye = np.eye(self.num_classes)
-        self.transition_matrix = (1 - self.noise_rate) * eye + self.noise_rate * np.roll(eye, 1, axis=1)
-
     def _inject_symmetric_noise(self):
         self.targets_gt = self.targets.copy()
-        num_noisy_samples = int(self.noise_rate * len(self))
-        target_mask = np.full_like(self.targets, False)
-        target_mask[:num_noisy_samples] = True
-        target_mask = sklearn.utils.shuffle(target_mask, random_state=self.random_state)
-        self.targets[target_mask] = scipy.stats.randint.rvs(0, self.num_classes,
-                                                size=num_noisy_samples,
-                                                random_state=self.random_state)
+        eye = np.eye(self.num_classes, dtype=np.int32)
+        transition_matrix = (1 - self.noise_rate) * eye + self.noise_rate * np.roll(eye, 1, axis=1)
 
     def _inject_asymmetric_noise(self):
         self.targets_gt = self.targets.copy()
-        pass
+        eye = np.eye(self.num_classes, dtype=np.int32)
+        transition_matrix = (1 - self.noise_rate) * eye + self.noise_rate * np.roll(eye, 1, axis=1)
+        in_dist = eye[self.targets_gt]
+        out_dist = in_dist @ transition_matrix
+        self.targets = self.rng_generator.choice(np.arange(len(out_dist)), p=out_dist)
 
     def __getitem__(self, index):
         img, target = super().__getitem__(index)
