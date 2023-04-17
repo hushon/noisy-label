@@ -100,22 +100,30 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
         self.rng_generator = np.random.default_rng(self.random_state)
 
         if noise_type == "symmetric":
-            self._inject_symmetric_noise()
+            transition_matrix = self._symmetric_label_transition_matrix(self.num_classes, noise_rate)
         elif noise_type == "asymmetric":
-            self._inject_asymmetric_noise()
+            transition_matrix = self._asymmetric_label_transition_matrix(self.num_classes, noise_rate)
+        self._inject_label_noise(transition_matrix)
 
-    def _inject_symmetric_noise(self):
+    @staticmethod
+    def _symmetric_label_transition_matrix(n, noise_rate):
+        transition_matrix = np.full((n, n), noise_rate / (n - 1))
+        np.fill_diagonal(transition_matrix, 1 - noise_rate)
+        return transition_matrix
+
+    @staticmethod
+    def _asymmetric_label_transition_matrix(n, noise_rate):
+        eye = np.eye(n, dtype=np.int32)
+        transition_matrix = (1 - noise_rate) * eye + noise_rate * np.roll(eye, 1, axis=1)
+        return transition_matrix
+
+    def _inject_label_noise(self, transition_matrix):
         self.targets_gt = self.targets.copy()
         eye = np.eye(self.num_classes, dtype=np.int32)
-        transition_matrix = (1 - self.noise_rate) * eye + self.noise_rate * np.roll(eye, 1, axis=1)
-
-    def _inject_asymmetric_noise(self):
-        self.targets_gt = self.targets.copy()
-        eye = np.eye(self.num_classes, dtype=np.int32)
-        transition_matrix = (1 - self.noise_rate) * eye + self.noise_rate * np.roll(eye, 1, axis=1)
-        in_dist = eye[self.targets_gt]
-        out_dist = in_dist @ transition_matrix
+        in_dist = eye[self.targets_gt] # one-hot encoding
+        out_dist = in_dist @ transition_matrix.T
         self.targets = self.rng_generator.choice(np.arange(len(out_dist)), p=out_dist)
+        pass
 
     def __getitem__(self, index):
         img, target = super().__getitem__(index)
