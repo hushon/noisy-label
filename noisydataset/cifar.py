@@ -29,9 +29,9 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
             ) -> None:
         super().__init__(root, train=train, transform=transform,
             target_transform=target_transform, download=download)
-        assert self.train == True, "train must be True"
-        assert 0.0 <= noise_rate <= 1.0, "noise_rate must be in [0, 1]"
-        assert noise_type in ["symmetric", "asymmetric"], "noise_type must be symmetric or asymmetric"
+        assert self.train == True
+        assert 0.0 <= noise_rate <= 1.0
+        assert noise_type in ["symmetric", "asymmetric"]
 
         self.data = np.array(self.data)
         self.targets = np.array(self.targets)
@@ -72,7 +72,6 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
         }
 
 
-
 class NoisyCIFAR100(torchvision.datasets.CIFAR100):
     """CIFAR-100 Dataset with synthetic label noise."""
     num_classes = 100
@@ -90,9 +89,9 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
             ) -> None:
         super().__init__(root, train=train, transform=transform,
             target_transform=target_transform, download=download)
-        assert self.train == True, "train must be True"
-        assert 0.0 <= noise_rate <= 1.0, "noise_rate must be in [0, 1]"
-        assert noise_type in ["symmetric", "asymmetric"], "noise_type must be symmetric or asymmetric"
+        assert self.train == True
+        assert 0.0 <= noise_rate <= 1.0
+        assert noise_type in ["symmetric", "asymmetric"]
 
         self.data = np.array(self.data)
         self.targets = np.array(self.targets)
