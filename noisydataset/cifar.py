@@ -1,8 +1,6 @@
 import torch
 import torchvision
 import numpy as np
-import sklearn.utils
-import scipy.stats
 
 
 class NoisyCIFAR10(torchvision.datasets.CIFAR10):
@@ -37,6 +35,7 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
         self.targets = np.array(self.targets)
         self.noise_rate = noise_rate
         self.random_state = random_state
+        self.rng = np.random.default_rng(self.random_state)
 
         if noise_type == "symmetric":
             self._inject_symmetric_noise()
@@ -48,17 +47,16 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
         num_noisy_samples = int(self.noise_rate * len(self))
         target_mask = np.full_like(self.targets, False)
         target_mask[:num_noisy_samples] = True
-        target_mask = sklearn.utils.shuffle(target_mask, random_state=self.random_state)
-        self.targets[target_mask] = scipy.stats.randint.rvs(0, self.num_classes,
-                                                size=num_noisy_samples,
-                                                random_state=self.random_state)
+        self.rng.shuffle(target_mask)
+        self.targets[target_mask] = self.rng.integers(0, self.num_classes,
+                                                    size=num_noisy_samples)
 
     def _inject_asymmetric_noise(self):
         self.targets_gt = self.targets.copy()
         num_noisy_samples = int(self.noise_rate * len(self))
         target_mask = np.full_like(self.targets, False)
         target_mask[:num_noisy_samples] = True
-        target_mask = sklearn.utils.shuffle(target_mask, random_state=self.random_state)
+        target_mask = self.rng.shuffle(target_mask)
         # change labels
         for gt, tgt in self.asymm_label_transition.items():
             self.targets[target_mask & (self.targets == gt)] = tgt
@@ -97,7 +95,7 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
         self.targets = np.array(self.targets)
         self.noise_rate = noise_rate
         self.random_state = random_state
-        self.rng_generator = np.random.default_rng(self.random_state)
+        self.rng = np.random.default_rng(self.random_state)
 
         if noise_type == "symmetric":
             transition_matrix = self._symmetric_label_transition_matrix(self.num_classes, noise_rate)
@@ -122,7 +120,7 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
         eye = np.eye(self.num_classes, dtype=np.int32)
         in_dist = eye[self.targets_gt] # one-hot encoding
         out_dist = in_dist @ transition_matrix
-        self.targets = self.rng_generator.choice(np.arange(len(out_dist)), p=out_dist)
+        self.targets = self.rng.choice(np.arange(len(out_dist)), p=out_dist)
         pass
 
     def __getitem__(self, index):
