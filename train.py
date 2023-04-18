@@ -5,6 +5,7 @@ import torch
 import numpy as np
 import random
 import wandb
+from models import resnet
 
 
 torch.backends.cudnn.deterministic = False
@@ -20,7 +21,7 @@ parser.add_argument('--data_root', type=str, default='/mnt/')
 parser.add_argument('--num_workers', type=int, default=4)
 parser.add_argument('--batch_size', type=int, default=128)
 # model
-parser.add_argument('--model', type=str, default='resnet50')
+parser.add_argument('--model', type=str, default='resnet18')
 # optimizer
 parser.add_argument('--optimizer', type=str, default="sgd", choices=["adam", "sgd"])
 parser.add_argument('--init_lr', type=float, default=1e-4)
