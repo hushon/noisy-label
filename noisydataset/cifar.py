@@ -151,7 +151,6 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
             download: bool = False,
             noise_rate: float = 0.2,
             noise_type: str = "symmetric",
-            random_state: int = 42,
             ) -> None:
         super().__init__(root, train=train, transform=transform,
             target_transform=target_transform, download=download)
@@ -162,8 +161,6 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
         self.data = np.array(self.data)
         self.targets = np.array(self.targets)
         self.noise_rate = noise_rate
-        self.random_state = random_state
-        self.rng = np.random.default_rng(self.random_state)
 
         if noise_type == "symmetric":
             self.transition_matrix = self._symmetric_transition_matrix(self.num_classes, noise_rate)
