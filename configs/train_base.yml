@@ -1,0 +1,19 @@
+data:
+  dataset: cifar10
+  noise_rate: 0.2
+  noise_type: symmetric
+  num_worker: 4
+  batch_size: 128
+
+model:
+  architecture: resnet18
+  num_classes: 10
+
+training:
+  optimizer: sgd
+  init_lr: 1e-1
+  momentum: 0.9
+  weight_decay: 1e-4
+  max_epoch: 200
+  logging: False
+
