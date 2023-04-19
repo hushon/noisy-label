@@ -20,5 +20,5 @@ trainer:
   lr_scheduler: cosine
   max_epoch: 200
   loss_fn: cross_entropy
-  num_workers: 4
+  num_workers: 0
   batch_size: 128

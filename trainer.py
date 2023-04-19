@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.utils.data
 import wandb
+import tqdm
 
 
 class Trainer(nn.Module):
@@ -18,8 +19,6 @@ class Trainer(nn.Module):
             )
         self.lr_scheduler = self.get_lr_scheduler(self.optimizer, self.config["lr_scheduler"], self.config["max_epoch"])
         self.criterion = self.get_loss_fn(self.config["loss_fn"])
-
-
 
     @staticmethod
     def get_optimizer(model, optimizer, init_lr, momentum, weight_decay) -> torch.optim.Optimizer:
@@ -80,9 +79,9 @@ class Trainer(nn.Module):
                 drop_last=False,
             )
 
-        for epoch in range(self.config["max_epoch"]):
+        for epoch in tqdm.trange(self.config["max_epoch"]):
             self.model.train()
-            for batch in enumerate(train_dataloader):
+            for batch in train_dataloader:
                 data, target = batch["image"].cuda(), batch["target"].cuda()
                 output = self.model(data)
                 loss = self.criterion(output, target)
@@ -103,7 +102,7 @@ class Trainer(nn.Module):
         self.model.eval()
         loss = 0
         correct = 0
-        for batch in enumerate(data_loader):
+        for batch in data_loader:
             data, target = batch["image"].cuda(), batch["target"].cuda()
             output = self.model(data)
             pred = output.argmax(dim=1, keepdim=True)

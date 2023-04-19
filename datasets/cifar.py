@@ -82,11 +82,11 @@ class CIFAR100(torchvision.datasets.CIFAR100):
 
 #     def __getitem__(self, index):
 #         img, target = super().__getitem__(index)
-#         return {
-#             'image': img,
-#             'target': target,
-#             'target_gt': self.targets_gt[index],
-#         }
+        # return {
+        #     'image': img,
+        #     'target': target,
+        #     'target_gt': self.targets_gt[index],
+        # }
 
 
 class NoisyCIFAR10(torchvision.datasets.CIFAR10):
@@ -150,8 +150,11 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
 
     def __getitem__(self, index):
         img, target = super().__getitem__(index)
-        return img, target
-
+        return {
+            'image': img,
+            'target': target,
+            'target_gt': self.targets_gt[index],
+        }
 
 class NoisyCIFAR100(torchvision.datasets.CIFAR100):
     """CIFAR-100 Dataset with synthetic label noise."""
@@ -202,4 +205,8 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
 
     def __getitem__(self, index):
         img, target = super().__getitem__(index)
-        return img, target
+        return {
+            'image': img,
+            'target': target,
+            'target_gt': self.targets_gt[index],
+        }
