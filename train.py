@@ -7,6 +7,10 @@ import random
 import wandb
 from models import resnet
 import yaml
+from trainer import Trainer
+import pprint
+from torchvision import datasets, transforms
+import noisydatasets
 
 
 torch.backends.cudnn.deterministic = False
@@ -14,65 +18,70 @@ torch.backends.cudnn.benchmark = True
 
 
 parser = argparse.ArgumentParser(description='Training Config', add_help=False)
-parser.add_argument('--config', type=str, default='./configs/train_base.yml')
+parser.add_argument('--config', type=str, required=True, help="./configs/train_base.yml")
 args = parser.parse_args()
 
 def get_dataset(dataset, noise_rate, noise_type):
+    transform_train = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ])
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ])
     if dataset == "noisy_cifar10":
-        return NoisyCIFAR10(noise_rate=noise_rate, noise_type=noise_type)
+        train = noisydatasets.NoisyCIFAR10("./data", download=True, transform=transform_train, noise_rate=noise_rate, noise_type=noise_type)
+        test = datasets.CIFAR10("./data", download=True, train=False, transform=transform_test)
     elif dataset == "noisy_cifar100":
-        return NoisyCIFAR100(noise_rate=noise_rate, noise_type=noise_type)
+        train = noisydatasets.NoisyCIFAR100("./data", download=True, transform=transform_train, noise_rate=noise_rate, noise_type=noise_type)
+        test = datasets.CIFAR100("./data", download=True, train=False, transform=transform_test)
+    else:
+        raise NotImplementedError
+    return train, test
 
 
-def get_model(model_name, num_classes):
-    if model_name == "resnet18":
-        return resnet.resnet18(num_classes=num_classes)
-    elif model_name == "resnet34":
-        return resnet.resnet34(num_classes=num_classes)
-    elif model_name == "resnet50":
-        return resnet.resnet50(num_classes=num_classes)
-    elif model_name == "resnet101":
-        return resnet.resnet101(num_classes=num_classes)
-    elif model_name == "resnet152":
-        return resnet.resnet152(num_classes=num_classes)
+def get_model(architecture, num_classes):
+    if architecture == "resnet18":
+        return resnet.resnet18(pretrained=False, in_channels=3, num_classes=num_classes)
+    elif architecture == "resnet34":
+        return resnet.resnet34(pretrained=False, in_channels=3, num_classes=num_classes)
+    elif architecture == "resnet50":
+        return resnet.resnet50(pretrained=False, in_channels=3, num_classes=num_classes)
+    elif architecture == "resnet101":
+        return resnet.resnet101(pretrained=False, in_channels=3, num_classes=num_classes)
+    elif architecture == "resnet152":
+        return resnet.resnet152(pretrained=False, in_channels=3, num_classes=num_classes)
     else:
         raise NotImplementedError
 
 
 def main():
+    # Load YAML config
     with open(args.config, 'r') as file:
         config = yaml.safe_load(file)
+    pprint.pprint(config)
 
-    wandb.init(
+    wandb_run = wandb.init(
         **config['wandb'],
         config=config,
     )
 
-    device = torch.device("cuda")
 
-    train_loader, test_loader = get_dataloader(
-        dataset=args.dataset,
-        data_root=args.data_root,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers,
-        )
+    train_dataset, test_dataset = get_dataset(**config["data"])
 
-    model = get_model(
-        model_name=args.model,
-        num_classes=10,
-    ).to(device)
-
+    model = get_model(**config["model"]).cuda()
 
     trainer = Trainer(
-                    train_loader=train_loader,
-                    test_loader=test_loader,
                     model=model,
-                    **config['trainer'],
+                    config=config['trainer'],
                     )
 
-    trainer.fit()
+    trainer.fit(train_dataset, test_dataset)
 
-    wandb.finish()
+    wandb_run.finish()
 
 if __name__ == '__main__':
     main()
