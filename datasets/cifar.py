@@ -5,7 +5,7 @@ from typing import Tuple, Any
 
 
 class CIFAR10(torchvision.datasets.CIFAR10):
-    def __getitem__(self, index: int) -> Tuple[Any, Any]:
+    def __getitem__(self, index: int):
         img, target = super().__getitem__(index)
         return {
             "image": img,
@@ -14,7 +14,7 @@ class CIFAR10(torchvision.datasets.CIFAR10):
 
 
 class CIFAR100(torchvision.datasets.CIFAR100):
-    def __getitem__(self, index: int) -> Tuple[Any, Any]:
+    def __getitem__(self, index: int):
         img, target = super().__getitem__(index)
         return {
             "image": img,
@@ -154,6 +154,7 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
             'target': target,
             'target_gt': self.targets_gt[index],
         }
+
 
 class NoisyCIFAR100(torchvision.datasets.CIFAR100):
     """CIFAR-100 Dataset with synthetic label noise."""
