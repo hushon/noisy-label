@@ -9,8 +9,8 @@ from models import resnet
 import yaml
 from trainer import Trainer
 import pprint
-from torchvision import datasets, transforms
-import noisydatasets
+from torchvision import transforms
+import datasets
 
 
 torch.backends.cudnn.deterministic = False
@@ -33,10 +33,10 @@ def get_dataset(dataset, noise_rate, noise_type):
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
     if dataset == "noisy_cifar10":
-        train = noisydatasets.NoisyCIFAR10("./data", download=True, transform=transform_train, noise_rate=noise_rate, noise_type=noise_type)
+        train = datasets.NoisyCIFAR10("./data", download=True, transform=transform_train, noise_rate=noise_rate, noise_type=noise_type)
         test = datasets.CIFAR10("./data", download=True, train=False, transform=transform_test)
     elif dataset == "noisy_cifar100":
-        train = noisydatasets.NoisyCIFAR100("./data", download=True, transform=transform_train, noise_rate=noise_rate, noise_type=noise_type)
+        train = datasets.NoisyCIFAR100("./data", download=True, transform=transform_train, noise_rate=noise_rate, noise_type=noise_type)
         test = datasets.CIFAR100("./data", download=True, train=False, transform=transform_test)
     else:
         raise NotImplementedError

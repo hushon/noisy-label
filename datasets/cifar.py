@@ -1,6 +1,25 @@
 import torch
 import torchvision
 import numpy as np
+from typing import Tuple, Any
+
+
+class CIFAR10(torchvision.datasets.CIFAR10):
+    def __getitem__(self, index: int) -> Tuple[Any, Any]:
+        img, target = super().__getitem__(index)
+        return {
+            "image": img,
+            "target": target,
+        }
+
+
+class CIFAR100(torchvision.datasets.CIFAR100):
+    def __getitem__(self, index: int) -> Tuple[Any, Any]:
+        img, target = super().__getitem__(index)
+        return {
+            "image": img,
+            "target": target,
+        }
 
 
 # class NoisyCIFAR10(torchvision.datasets.CIFAR10):
