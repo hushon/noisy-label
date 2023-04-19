@@ -91,7 +91,6 @@ class CIFAR100(torchvision.datasets.CIFAR100):
 
 class NoisyCIFAR10(torchvision.datasets.CIFAR10):
     """CIFAR-10 Dataset with synthetic label noise."""
-    num_classes = 10
 
     def __init__(
             self,
@@ -117,15 +116,15 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
         self.rng = np.random.default_rng(self.random_state)
 
         if noise_type == "symmetric":
-            self.transition_matrix = self._symmetric_transition_matrix(self.num_classes, noise_rate)
+            self.transition_matrix = self._symmetric_transition_matrix(noise_rate)
         elif noise_type == "asymmetric":
-            self.transition_matrix = self._asymmetric_transition_matrix(self.num_classes, noise_rate)
+            self.transition_matrix = self._asymmetric_transition_matrix(noise_rate)
         self._inject_label_noise(self.transition_matrix)
 
     @staticmethod
-    def _symmetric_transition_matrix(n, noise_rate):
-        transition_matrix = np.full((n, n), noise_rate / (n - 1))
-        np.fill_diagonal(transition_matrix, 1 - noise_rate)
+    def _symmetric_transition_matrix(noise_rate):
+        transition_matrix = np.full((10, 10), noise_rate / (10 - 1))
+        np.fill_diagonal(transition_matrix, 1.0 - noise_rate)
         return transition_matrix
 
     @staticmethod
@@ -137,7 +136,7 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
             5: 3,  # dog -> cat
             4: 7,  # deer -> horse
         }
-        transition_matrix = np.eye(n)
+        transition_matrix = np.eye(10)
         for k, v in cifar10_asymm_label_transition.items():
             transition_matrix[k, k] = 1.0 - noise_rate
             transition_matrix[k, v] = noise_rate
@@ -158,7 +157,6 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
 
 class NoisyCIFAR100(torchvision.datasets.CIFAR100):
     """CIFAR-100 Dataset with synthetic label noise."""
-    num_classes = 100
 
     def __init__(
             self,
@@ -181,20 +179,20 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
         self.noise_rate = noise_rate
 
         if noise_type == "symmetric":
-            self.transition_matrix = self._symmetric_transition_matrix(self.num_classes, noise_rate)
+            self.transition_matrix = self._symmetric_transition_matrix(noise_rate)
         elif noise_type == "asymmetric":
-            self.transition_matrix = self._asymmetric_transition_matrix(self.num_classes, noise_rate)
+            self.transition_matrix = self._asymmetric_transition_matrix(noise_rate)
         self._inject_label_noise(self.transition_matrix)
 
     @staticmethod
-    def _symmetric_transition_matrix(n, noise_rate):
-        transition_matrix = np.full((n, n), noise_rate / (n - 1))
+    def _symmetric_transition_matrix(noise_rate):
+        transition_matrix = np.full((100, 100), noise_rate / (100 - 1))
         np.fill_diagonal(transition_matrix, 1 - noise_rate)
         return transition_matrix
 
     @staticmethod
-    def _asymmetric_transition_matrix(n, noise_rate):
-        eye = np.eye(n, dtype=np.int32)
+    def _asymmetric_transition_matrix(noise_rate):
+        eye = np.eye(100, dtype=np.int32)
         transition_matrix = (1 - noise_rate) * eye + noise_rate * np.roll(eye, 1, axis=1)
         return transition_matrix
 
