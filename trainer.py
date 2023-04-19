@@ -2,10 +2,11 @@ import torch
 import torch.nn as nn
 import torch.utils.data
 import tqdm.auto as tqdm
+import os
 
 
 class Trainer(nn.Module):
-    def __init__(self, model, config, wandb_run=None):
+    def __init__(self, model, config, wandb_run):
         super(Trainer, self).__init__()
         self.model = model
         self.config = config
@@ -63,10 +64,9 @@ class Trainer(nn.Module):
             drop_last=train,
         )
 
-    def fit(self, train_dataset, val_dataset=None):
+    def fit(self, train_dataset, val_dataset):
         train_dataloader = self.get_dataloader(train_dataset, train=True)
-        if val_dataset is not None:
-            val_dataloader = self.get_dataloader(val_dataset, train=False)
+        val_dataloader = self.get_dataloader(val_dataset, train=False)
 
         optimizer = self.get_optimizer(
             model=self.model,
@@ -88,22 +88,20 @@ class Trainer(nn.Module):
                 loss.backward()
                 optimizer.step()
             lr_scheduler.step()
-            if val_dataset is not None:
-                val_loss, val_acc = self._evaluate(val_dataloader)
-                tqdm.tqdm.write(
-                    f"Epoch: {epoch}, Train Loss: {loss.item():.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}"
-                )
-            else:
-                val_loss, val_acc = None, None
-            if self.wandb_run is not None:
-                self.wandb_run.log(
-                    {
-                        "epoch": epoch,
-                        "train_loss": loss.item(),
-                        "val_loss": val_loss,
-                        "val_acc": val_acc,
-                    }
-                )
+            val_loss, val_acc = self._evaluate(val_dataloader)
+            tqdm.tqdm.write(f"Epoch: {epoch}, Train Loss: {loss.item():.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}")
+
+            self.wandb_run.log(
+                {
+                    "epoch": epoch,
+                    "train_loss": loss.item(),
+                    "val_loss": val_loss,
+                    "val_acc": val_acc,
+                }
+            )
+            if self.config["save_model"]:
+                torch.save(self.model.state_dict(), os.path.join(self.wandb_run.dir, f"model_{epoch}.pth"))
+                self.wandb_run.save("*.pth")
 
     @torch.no_grad()
     def _evaluate(self, data_loader):
