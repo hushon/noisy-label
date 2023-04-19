@@ -69,7 +69,6 @@ def main():
         config=config,
     )
 
-
     train_dataset, test_dataset = get_dataset(**config["data"])
 
     model = get_model(**config["model"]).cuda()
@@ -77,6 +76,7 @@ def main():
     trainer = Trainer(
                     model=model,
                     config=config['trainer'],
+                    wandb_run=wandb_run,
                     )
 
     trainer.fit(train_dataset, test_dataset)

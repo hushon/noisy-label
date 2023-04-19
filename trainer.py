@@ -1,23 +1,15 @@
 import torch
 import torch.nn as nn
 import torch.utils.data
-import wandb
-import tqdm
+import tqdm.auto as tqdm
 
 
 class Trainer(nn.Module):
-    def __init__(self, model, config):
+    def __init__(self, model, config, wandb_run=None):
         super(Trainer, self).__init__()
         self.model = model
         self.config = config
-        self.optimizer = self.get_optimizer(
-            model=self.model,
-            optimizer=self.config["optimizer"],
-            init_lr=self.config["init_lr"],
-            momentum=self.config["momentum"],
-            weight_decay=self.config["weight_decay"],
-            )
-        self.lr_scheduler = self.get_lr_scheduler(self.optimizer, self.config["lr_scheduler"], self.config["max_epoch"])
+        self.wandb_run = wandb_run
         self.criterion = self.get_loss_fn(self.config["loss_fn"])
 
     @staticmethod
@@ -58,44 +50,60 @@ class Trainer(nn.Module):
     @staticmethod
     def get_loss_fn(loss_fn) -> torch.nn.Module:
         if loss_fn == "cross_entropy":
-            return nn.CrossEntropyLoss()
+            return nn.CrossEntropyLoss(reduction="none")
         else:
             raise NotImplementedError
 
-    def fit(self, train_dataset, val_dataset=None):
-        train_dataloader = torch.utils.data.DataLoader(
-            train_dataset,
+    def get_dataloader(self, dataset, train=True):
+        return torch.utils.data.DataLoader(
+            dataset,
             batch_size=self.config["batch_size"],
-            shuffle=True,
+            shuffle=train,
             num_workers=self.config["num_workers"],
-            drop_last=True,
+            drop_last=train,
         )
+
+    def fit(self, train_dataset, val_dataset=None):
+        train_dataloader = self.get_dataloader(train_dataset, train=True)
         if val_dataset is not None:
-            val_dataloader = torch.utils.data.DataLoader(
-                val_dataset,
-                batch_size=self.config["batch_size"],
-                shuffle=False,
-                num_workers=self.config["num_workers"],
-                drop_last=False,
+            val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        optimizer = self.get_optimizer(
+            model=self.model,
+            optimizer=self.config["optimizer"],
+            init_lr=self.config["init_lr"],
+            momentum=self.config["momentum"],
+            weight_decay=self.config["weight_decay"],
             )
+        lr_scheduler = self.get_lr_scheduler(optimizer, self.config["lr_scheduler"], self.config["max_epoch"])
+
 
         for epoch in tqdm.trange(self.config["max_epoch"]):
             self.model.train()
             for batch in train_dataloader:
                 data, target = batch["image"].cuda(), batch["target"].cuda()
                 output = self.model(data)
-                loss = self.criterion(output, target)
-                self.optimizer.zero_grad()
+                loss = self.criterion(output, target).mean()
+                optimizer.zero_grad()
                 loss.backward()
-                self.optimizer.step()
-            self.lr_scheduler.step()
+                optimizer.step()
+            lr_scheduler.step()
             if val_dataset is not None:
                 val_loss, val_acc = self._evaluate(val_dataloader)
-                print(
+                tqdm.tqdm.write(
                     f"Epoch: {epoch}, Train Loss: {loss.item():.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}"
                 )
             else:
-                print(f"Epoch: {epoch}, Train Loss: {loss.item():.4f}")
+                val_loss, val_acc = None, None
+            if self.wandb_run is not None:
+                self.wandb_run.log(
+                    {
+                        "epoch": epoch,
+                        "train_loss": loss.item(),
+                        "val_loss": val_loss,
+                        "val_acc": val_acc,
+                    }
+                )
 
     @torch.no_grad()
     def _evaluate(self, data_loader):
@@ -106,20 +114,11 @@ class Trainer(nn.Module):
             data, target = batch["image"].cuda(), batch["target"].cuda()
             output = self.model(data)
             pred = output.argmax(dim=1, keepdim=True)
-            loss += self.criterion(output, target, reduction="sum")
+            loss += self.criterion(output, target).sum()
             correct += pred.eq(target.view_as(pred)).sum()
         loss /= len(data_loader.dataset)
         accuracy = 100. * correct / len(data_loader.dataset)
         return loss.item(), accuracy.item()
-
-
-def get_optimizer(model):
-    return torch.optim.SGD(
-        model.parameters(),
-        lr=0.001,
-        momentum=0.9,
-        weight_decay=1e-4,
-    )
 
 
 @torch.no_grad()
