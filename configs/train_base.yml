@@ -8,9 +8,9 @@ model:
   num_classes: 10
 
 wandb:
-  mode: disabled # "disabled" or "online"
+  mode: online # "disabled" or "online"
   project: noisy-label
-  entity: noisy-label
+  entity: siit-iitp
 
 trainer:
   optimizer: sgd

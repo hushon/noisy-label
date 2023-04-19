@@ -5,9 +5,8 @@ import tqdm.auto as tqdm
 import os
 
 
-class Trainer(nn.Module):
+class Trainer:
     def __init__(self, model, config, wandb_run):
-        super(Trainer, self).__init__()
         self.model = model
         self.config = config
         self.wandb_run = wandb_run
