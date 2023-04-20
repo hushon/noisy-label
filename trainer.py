@@ -12,37 +12,36 @@ class Trainer:
         self.wandb_run = wandb_run
         self.criterion = self.get_loss_fn(self.config["loss_fn"])
 
-    @staticmethod
-    def get_optimizer(model, optimizer, init_lr, momentum, weight_decay) -> torch.optim.Optimizer:
-        if optimizer == "sgd":
+    def get_optimizer(self, model) -> torch.optim.Optimizer:
+        if self.config["optimizer"] == "sgd":
             return torch.optim.SGD(
                 model.parameters(),
-                lr=init_lr,
-                momentum=momentum,
-                weight_decay=weight_decay,
+                lr=self.config["init_lr"],
+                momentum=self.config["momentum"],
+                weight_decay=self.config["weight_decay"],
             )
-        elif optimizer == "adam":
+        elif self.config["optimizer"] == "adam":
             return torch.optim.Adam(
                 model.parameters(),
-                lr=init_lr,
-                weight_decay=weight_decay,
+                lr=self.config["init_lr"],
+                weight_decay=self.config["weight_decay"],
             )
         else:
             raise NotImplementedError
 
-    @staticmethod
-    def get_lr_scheduler(optimizer, lr_scheduler, max_epoch) -> torch.optim.lr_scheduler.LRScheduler:
-        if lr_scheduler == "cosine":
+    def get_lr_scheduler(self, optimizer) -> torch.optim.lr_scheduler.LRScheduler:
+        if self.config["lr_scheduler"] == "cosine":
             return torch.optim.lr_scheduler.CosineAnnealingLR(
                 optimizer,
-                T_max=max_epoch,
+                T_max=self.config["max_epoch"],
                 eta_min=0.0,
             )
-        elif lr_scheduler == "step":
-            return torch.optim.lr_scheduler.StepLR(
+        elif self.config["lr_scheduler"] == "multistep":
+            n = self.config["max_epoch"] // 10
+            return torch.optim.lr_scheduler.MultiStepLR(
                 optimizer,
-                step_size=50,
-                gamma=0.1,
+                milestones=[3*n, 6*n, 8*n],
+                gamma=0.2,
             )
         else:
             raise NotImplementedError
@@ -67,17 +66,12 @@ class Trainer:
         train_dataloader = self.get_dataloader(train_dataset, train=True)
         val_dataloader = self.get_dataloader(val_dataset, train=False)
 
-        optimizer = self.get_optimizer(
-            model=self.model,
-            optimizer=self.config["optimizer"],
-            init_lr=self.config["init_lr"],
-            momentum=self.config["momentum"],
-            weight_decay=self.config["weight_decay"],
-            )
-        lr_scheduler = self.get_lr_scheduler(optimizer, self.config["lr_scheduler"], self.config["max_epoch"])
-
+        optimizer = self.get_optimizer(self.model)
+        lr_scheduler = self.get_lr_scheduler(optimizer)
 
         for epoch in tqdm.trange(self.config["max_epoch"]):
+            train_loss = []
+            train_acc = []
             self.model.train()
             for batch in train_dataloader:
                 data, target = batch["image"].cuda(), batch["target"].cuda()
@@ -86,10 +80,15 @@ class Trainer:
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
+                train_loss.append(loss)
+                train_acc.append(calculate_accuracy(output, target))
             lr_scheduler.step()
-            val_loss, val_acc = self._evaluate(val_dataloader)
-            tqdm.tqdm.write(f"Epoch: {epoch}, Train Loss: {loss.item():.4f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}")
 
+            train_loss = torch.stack(train_loss).mean().item()
+            train_acc = torch.stack(train_acc).mean().item()
+
+            val_loss, val_acc = self._evaluate(val_dataloader)
+            tqdm.tqdm.write(f"Epoch {epoch}\t Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}")
             self.wandb_run.log(
                 {
                     "epoch": epoch,
@@ -98,7 +97,7 @@ class Trainer:
                     "val_acc": val_acc,
                 }
             )
-            if self.config["save_model"]:
+            if self.config["save_model"] and (epoch+1)%10 == 0:
                 torch.save(self.model.state_dict(), os.path.join(self.wandb_run.dir, f"model_{epoch}.pth"))
                 self.wandb_run.save("*.pth")
 

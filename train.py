@@ -13,6 +13,8 @@ from torchvision import transforms
 import datasets
 
 
+np.random.seed(0)
+torch.manual_seed(42)
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = True
 
