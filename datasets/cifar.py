@@ -128,7 +128,8 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
         return transition_matrix
 
     @staticmethod
-    def _asymmetric_transition_matrix(n, noise_rate) -> np.ndarray:
+    def _asymmetric_transition_matrix(noise_rate) -> np.ndarray:
+        breakpoint()
         cifar10_asymm_label_transition = {
             9: 1,  # truck -> automobile
             2: 0,  # bird -> airplane
