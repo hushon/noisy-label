@@ -1,16 +1,44 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.utils.data
 import tqdm.auto as tqdm
 import os
 
 
+class MeanAbsoluteError(torch.nn.Module):
+    def __init__(self, num_classes, reduction="mean"):
+        super().__init__()
+        self.num_classes = num_classes
+        self.reduction = reduction
+
+    def forward(self, pred, labels):
+        pred = F.softmax(pred, dim=1)
+        label_one_hot = torch.nn.functional.one_hot(labels, self.num_classes).float()
+        # mae = 1. - torch.sum(label_one_hot * pred, dim=1)
+        mae = 1. - torch.gather(pred, 1, labels.view(-1, 1))
+        # Note: Reduced MAE
+        # Original: torch.abs(pred - label_one_hot).sum(dim=1)
+        # $MAE = \sum_{k=1}^{K} |\bm{p}(k|\bm{x}) - \bm{q}(k|\bm{x})|$
+        # $MAE = \sum_{k=1}^{K}\bm{p}(k|\bm{x}) - p(y|\bm{x}) + (1 - p(y|\bm{x}))$
+        # $MAE = 2 - 2p(y|\bm{x})$
+        #
+        if self.reduction == "mean":
+            return mae.mean()
+        elif self.reduction == "sum":
+            return mae.sum()
+        elif self.reduction == "none":
+            return mae
+        else:
+            raise NotImplementedError
+
+
 class Trainer:
     def __init__(self, model, config, wandb_run):
-        self.model = model
+        self.model = model.cuda()
         self.config = config
         self.wandb_run = wandb_run
-        self.criterion = self.get_loss_fn(self.config["loss_fn"])
+        self.criterion = self.get_loss_fn().cuda()
 
     def get_optimizer(self, model) -> torch.optim.Optimizer:
         if self.config["optimizer"] == "sgd":
@@ -46,12 +74,11 @@ class Trainer:
         else:
             raise NotImplementedError
 
-    @staticmethod
-    def get_loss_fn(loss_fn) -> torch.nn.Module:
-        if loss_fn == "cross_entropy":
+    def get_loss_fn(self) -> torch.nn.Module:
+        if self.config["loss_fn"] == "cross_entropy":
             return nn.CrossEntropyLoss(reduction="none")
-        if loss_fn == "mae":
-            return nn.L1Loss(reduction="none")
+        if self.config["loss_fn"] == "mae":
+            return MeanAbsoluteError(num_classes=self.config["num_classes"], reduction="none")
         else:
             raise NotImplementedError
 
@@ -89,7 +116,7 @@ class Trainer:
             train_acc = torch.stack(train_acc).mean().item()
 
             val_loss, val_acc = self._evaluate(val_dataloader)
-            tqdm.tqdm.write(f"Ep {epoch}\t Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}")
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}")
             self.wandb_run.log(
                 {
                     "epoch": epoch,

@@ -14,12 +14,13 @@ wandb:
 
 trainer:
   optimizer: sgd
-  init_lr: 0.1
+  init_lr: 1.0e-1
   momentum: 0.9
-  weight_decay: 0.0001
+  weight_decay: 1.0e-4
   lr_scheduler: multistep
   max_epoch: 200
   loss_fn: mae
-  num_workers: 0
+  num_classes: 10
+  num_workers: 2
   batch_size: 128
   save_model: true
