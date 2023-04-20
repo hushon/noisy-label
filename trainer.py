@@ -50,6 +50,8 @@ class Trainer:
     def get_loss_fn(loss_fn) -> torch.nn.Module:
         if loss_fn == "cross_entropy":
             return nn.CrossEntropyLoss(reduction="none")
+        if loss_fn == "mae":
+            return nn.L1Loss(reduction="none")
         else:
             raise NotImplementedError
 
