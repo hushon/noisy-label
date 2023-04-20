@@ -83,6 +83,12 @@ def main():
 
     trainer.fit(train_dataset, test_dataset)
 
+
+    # wandb_run.alert(
+    #     title="Training finished",
+    #     text="this is a test message",
+    #     level=wandb.AlertLevel.INFO,
+    # )
     wandb_run.finish()
 
 if __name__ == '__main__':
