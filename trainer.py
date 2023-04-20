@@ -119,7 +119,6 @@ class Trainer:
             tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}")
             self.wandb_run.log(
                 {
-                    "epoch": epoch,
                     "learning_rate": lr_scheduler.get_last_lr()[0],
                     "train_acc": train_acc,
                     "train_loss": train_loss,
