@@ -7,16 +7,14 @@ import os
 
 
 class MeanAbsoluteError(torch.nn.Module):
-    def __init__(self, num_classes, reduction="mean"):
+    def __init__(self, reduction="mean"):
         super().__init__()
-        self.num_classes = num_classes
         self.reduction = reduction
 
     def forward(self, pred, labels):
         pred = F.softmax(pred, dim=1)
-        label_one_hot = torch.nn.functional.one_hot(labels, self.num_classes).float()
-        # mae = 1. - torch.sum(label_one_hot * pred, dim=1)
         mae = 1. - torch.gather(pred, 1, labels.view(-1, 1))
+        mae = mae.squeeze(1)
         # Note: Reduced MAE
         # Original: torch.abs(pred - label_one_hot).sum(dim=1)
         # $MAE = \sum_{k=1}^{K} |\bm{p}(k|\bm{x}) - \bm{q}(k|\bm{x})|$
@@ -34,7 +32,7 @@ class MeanAbsoluteError(torch.nn.Module):
 
 
 class Trainer:
-    def __init__(self, model, config, wandb_run):
+    def __init__(self, model, config, wandb_run=None):
         self.model = model.cuda()
         self.config = config
         self.wandb_run = wandb_run
@@ -78,7 +76,7 @@ class Trainer:
         if self.config["loss_fn"] == "cross_entropy":
             return nn.CrossEntropyLoss(reduction="none")
         if self.config["loss_fn"] == "mae":
-            return MeanAbsoluteError(num_classes=self.config["num_classes"], reduction="none")
+            return MeanAbsoluteError(reduction="none")
         else:
             raise NotImplementedError
 
@@ -131,19 +129,47 @@ class Trainer:
                 self.wandb_run.save("*.pth")
 
     @torch.no_grad()
-    def _evaluate(self, data_loader):
+    def _evaluate(self, dataloader):
         self.model.eval()
         loss = 0
         correct = 0
-        for batch in data_loader:
+        for batch in dataloader:
             data, target = batch["image"].cuda(), batch["target"].cuda()
             output = self.model(data)
             pred = output.argmax(dim=1, keepdim=True)
             loss += self.criterion(output, target).sum()
             correct += pred.eq(target.view_as(pred)).sum()
-        loss /= len(data_loader.dataset)
-        accuracy = 100. * correct / len(data_loader.dataset)
+        loss /= len(dataloader.dataset)
+        accuracy = 100. * correct / len(dataloader.dataset)
         return loss.item(), accuracy.item()
+
+    @torch.no_grad()
+    def filter_noisy(self, dataset):
+        self.model.eval()
+        dataloader = self.get_dataloader(dataset, train=False)
+        score_list = []
+        is_noisy_list = []
+        for batch in dataloader:
+            data, target = batch["image"].cuda(), batch["target"].cuda()
+            target_gt = batch["target_gt"].cuda()
+            losses = []
+            for _ in range(10):
+                data += torch.randn_like(data).mul_(0.1)
+                output = self.model(data)
+                losses.append(self.criterion(output, target))
+            std, mean = torch.std_mean(torch.cat(losses, dim=-1), dim=-1)
+            score = std
+            is_noisy = (target != target_gt)
+
+            score_list.append(score)
+            is_noisy_list.append(is_noisy)
+        
+        score = torch.cat(score_list, dim=0).cpu()
+        is_noisy = torch.cat(is_noisy_list, dim=0).cpu()
+        return {
+            'score': score,
+            'is_noisy': is_noisy,
+        }
 
 
 @torch.no_grad()
