@@ -14,6 +14,7 @@ class MeanAbsoluteError(torch.nn.Module):
     def forward(self, pred, labels):
         pred = F.softmax(pred, dim=1)
         mae = 1. - torch.gather(pred, 1, labels.view(-1, 1))
+        mae = mae.squeeze(1)
         # Note: Reduced MAE
         # Original: torch.abs(pred - label_one_hot).sum(dim=1)
         # $MAE = \sum_{k=1}^{K} |\bm{p}(k|\bm{x}) - \bm{q}(k|\bm{x})|$
@@ -31,7 +32,7 @@ class MeanAbsoluteError(torch.nn.Module):
 
 
 class Trainer:
-    def __init__(self, model, config, wandb_run):
+    def __init__(self, model, config, wandb_run=None):
         self.model = model.cuda()
         self.config = config
         self.wandb_run = wandb_run
@@ -146,20 +147,29 @@ class Trainer:
     def filter_noisy(self, dataset):
         self.model.eval()
         dataloader = self.get_dataloader(dataset, train=False)
-        score = []
+        score_list = []
+        is_noisy_list = []
         for batch in dataloader:
             data, target = batch["image"].cuda(), batch["target"].cuda()
-            target_gt = batch["target_gt"]
+            target_gt = batch["target_gt"].cuda()
             losses = []
             for _ in range(10):
                 data += torch.randn_like(data).mul_(0.1)
                 output = self.model(data)
                 losses.append(self.criterion(output, target))
-            std, mean = torch.std_mean(torch.stack(losses, dim=-1), dim=-1)
-            score.append(std)
+            std, mean = torch.std_mean(torch.cat(losses, dim=-1), dim=-1)
+            score = std
+            is_noisy = (target != target_gt)
 
-            is_noisy = (target == target_gt)
-        return 
+            score_list.append(score)
+            is_noisy_list.append(is_noisy)
+        
+        score = torch.cat(score_list, dim=0).cpu()
+        is_noisy = torch.cat(is_noisy_list, dim=0).cpu()
+        return {
+            'score': score,
+            'is_noisy': is_noisy,
+        }
 
 
 @torch.no_grad()
