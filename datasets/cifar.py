@@ -122,8 +122,7 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
         self.data = np.array(self.data)
         self.targets = np.array(self.targets)
         self.noise_rate = noise_rate
-        self.random_seed = random_seed
-        self.rng = torch.Generator().manual_seed(self.random_seed)
+        self.rng = torch.Generator().manual_seed(random_seed)
 
         if noise_type == "symmetric":
             self.transition_matrix = self._symmetric_transition_matrix(noise_rate)
@@ -189,8 +188,7 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
         self.data = np.array(self.data)
         self.targets = np.array(self.targets)
         self.noise_rate = noise_rate
-        self.random_seed = random_seed
-        self.rng = torch.Generator().manual_seed(self.random_seed)
+        self.rng = torch.Generator().manual_seed(random_seed)
 
         if noise_type == "symmetric":
             self.transition_matrix = self._symmetric_transition_matrix(noise_rate)
