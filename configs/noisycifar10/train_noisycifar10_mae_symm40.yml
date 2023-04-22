@@ -1,6 +1,6 @@
 data:
   dataset: noisy_cifar10
-  noise_rate: 0.2
+  noise_rate: 0.4
   noise_type: symmetric
 
 model:
@@ -8,7 +8,7 @@ model:
   num_classes: 10
 
 wandb:
-  mode: disabled # "disabled" or "online"
+  mode: online # "disabled" or "online"
   entity: siit-iitp
   project: noisy-label
 

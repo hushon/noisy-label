@@ -125,8 +125,9 @@ class Trainer:
                 }
             )
             if self.config["save_model"] and (epoch+1)%10 == 0:
-                torch.save(self.model.state_dict(), os.path.join(self.wandb_run.dir, f"model_{epoch}.pth"))
-                self.wandb_run.save("*.pth")
+                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
+                torch.save(self.model.state_dict(), filepath)
+                self.wandb_run.save(filepath)
 
     @torch.no_grad()
     def _evaluate(self, dataloader):

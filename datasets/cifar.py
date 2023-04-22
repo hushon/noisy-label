@@ -4,6 +4,16 @@ import numpy as np
 from typing import Tuple, Any
 
 
+class Categorical(torch.distributions.Categorical):
+    """Categorical distribution with specified random number generator."""
+    def sample(self, sample_shape=torch.Size(), generator=None):
+        if not isinstance(sample_shape, torch.Size):
+            sample_shape = torch.Size(sample_shape)
+        probs_2d = self.probs.reshape(-1, self._num_events)
+        samples_2d = torch.multinomial(probs_2d, sample_shape.numel(), True, generator=generator).T
+        return samples_2d.reshape(self._extended_shape(sample_shape))
+
+
 class CIFAR10(torchvision.datasets.CIFAR10):
     def __getitem__(self, index: int):
         img, target = super().__getitem__(index)
@@ -101,7 +111,7 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
             download: bool = False,
             noise_rate: float = 0.2,
             noise_type: str = "symmetric",
-            random_state: int = 42,
+            random_seed: int = 42,
             ) -> None:
         super().__init__(root, train=train, transform=transform,
             target_transform=target_transform, download=download)
@@ -112,8 +122,8 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
         self.data = np.array(self.data)
         self.targets = np.array(self.targets)
         self.noise_rate = noise_rate
-        self.random_state = random_state
-        self.rng = np.random.default_rng(self.random_state)
+        self.random_seed = random_seed
+        self.rng = torch.Generator().manual_seed(self.random_seed)
 
         if noise_type == "symmetric":
             self.transition_matrix = self._symmetric_transition_matrix(noise_rate)
@@ -145,7 +155,7 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
     def _inject_label_noise(self, transition_matrix):
         self.targets_gt = self.targets.copy()
         out_dist = transition_matrix[self.targets_gt]
-        self.targets = torch.distributions.Categorical(torch.tensor(out_dist)).sample().numpy()
+        self.targets = Categorical(torch.tensor(out_dist)).sample(generator=self.rng).numpy()
 
     def __getitem__(self, index):
         img, target = super().__getitem__(index)
@@ -168,6 +178,7 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
             download: bool = False,
             noise_rate: float = 0.2,
             noise_type: str = "symmetric",
+            random_seed: int = 42,
             ) -> None:
         super().__init__(root, train=train, transform=transform,
             target_transform=target_transform, download=download)
@@ -178,6 +189,8 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
         self.data = np.array(self.data)
         self.targets = np.array(self.targets)
         self.noise_rate = noise_rate
+        self.random_seed = random_seed
+        self.rng = torch.Generator().manual_seed(self.random_seed)
 
         if noise_type == "symmetric":
             self.transition_matrix = self._symmetric_transition_matrix(noise_rate)
@@ -200,7 +213,7 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
     def _inject_label_noise(self, transition_matrix):
         self.targets_gt = self.targets.copy()
         out_dist = transition_matrix[self.targets_gt]
-        self.targets = torch.distributions.Categorical(torch.tensor(out_dist)).sample().numpy()
+        self.targets = Categorical(torch.tensor(out_dist)).sample(generator=self.rng).numpy()
 
     def __getitem__(self, index):
         img, target = super().__getitem__(index)
