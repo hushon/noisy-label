@@ -1,0 +1,25 @@
+data:
+  dataset: noisy_cifar10
+  noise_rate: 0.1
+  noise_type: asymmetric
+
+model:
+  architecture: resnet18
+  num_classes: 10
+
+wandb:
+  mode: online # "disabled" or "online"
+  entity: siit-iitp
+  project: noisy-label
+
+trainer:
+  optimizer: sgd
+  init_lr: 1.0e-1
+  momentum: 0.9
+  weight_decay: 1.0e-4
+  lr_scheduler: multistep
+  max_epoch: 200
+  loss_fn: mae
+  num_workers: 2
+  batch_size: 128
+  save_model: true

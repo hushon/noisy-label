@@ -23,7 +23,7 @@ parser = argparse.ArgumentParser(description='Training Config', add_help=False)
 parser.add_argument('--config', type=str, required=True, help="./configs/train_base.yml")
 args = parser.parse_args()
 
-def get_dataset(dataset, noise_rate, noise_type):
+def get_dataset(dataset, noise_rate, noise_type, random_seed):
     transform_train = transforms.Compose([
         transforms.RandomCrop(32, padding=4),
         transforms.RandomHorizontalFlip(),
@@ -35,10 +35,10 @@ def get_dataset(dataset, noise_rate, noise_type):
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     ])
     if dataset == "noisy_cifar10":
-        train = datasets.NoisyCIFAR10("./data", download=True, transform=transform_train, noise_rate=noise_rate, noise_type=noise_type)
+        train = datasets.NoisyCIFAR10("./data", download=True, transform=transform_train, noise_rate=noise_rate, noise_type=noise_type, random_seed=random_seed)
         test = datasets.CIFAR10("./data", download=True, train=False, transform=transform_test)
     elif dataset == "noisy_cifar100":
-        train = datasets.NoisyCIFAR100("./data", download=True, transform=transform_train, noise_rate=noise_rate, noise_type=noise_type)
+        train = datasets.NoisyCIFAR100("./data", download=True, transform=transform_train, noise_rate=noise_rate, noise_type=noise_type, random_seed=random_seed)
         test = datasets.CIFAR100("./data", download=True, train=False, transform=transform_test)
     else:
         raise NotImplementedError
