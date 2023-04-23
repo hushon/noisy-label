@@ -97,8 +97,11 @@ class Trainer:
         lr_scheduler = self.get_lr_scheduler(optimizer)
 
         for epoch in tqdm.trange(self.config["max_epoch"]):
-            train_loss = []
-            train_acc = []
+            train_stats = {
+                "loss": [],
+                "t1acc": [],
+                "t5acc": [],
+            }
             self.model.train()
             for batch in train_dataloader:
                 data, target = batch["image"].cuda(), batch["target"].cuda()
@@ -107,21 +110,21 @@ class Trainer:
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                train_loss.append(loss)
-                train_acc.append(calculate_accuracy(output, target))
+                train_stats["loss"].append(loss.detach())
+                train_stats["t1acc"].append(calculate_accuracy(output, target))
+                train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
             lr_scheduler.step()
-            train_loss = torch.stack(train_loss).mean().item()
-            train_acc = torch.stack(train_acc).mean().item()
+            train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
+            train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
+            train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
 
-            val_loss, val_acc = self._evaluate(val_dataloader)
-            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}, Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}")
+            val_stats = self._evaluate(val_dataloader)
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t5acc']:.2f}")
             self.wandb_run.log(
                 {
                     "learning_rate": lr_scheduler.get_last_lr()[0],
-                    "train_acc": train_acc,
-                    "train_loss": train_loss,
-                    "val_loss": val_loss,
-                    "val_acc": val_acc,
+                    **{'train_'+k: v for k, v in train_stats.items()},
+                    **{'val_'+k: v for k, v in val_stats.items()},
                 }
             )
             if self.config["save_model"] and (epoch+1)%10 == 0:
@@ -132,17 +135,22 @@ class Trainer:
     @torch.no_grad()
     def _evaluate(self, dataloader):
         self.model.eval()
-        loss = 0
-        correct = 0
+        stats = {
+            "loss": [],
+            "t1acc": [],
+            "t5acc": [],
+        }
         for batch in dataloader:
             data, target = batch["image"].cuda(), batch["target"].cuda()
             output = self.model(data)
-            pred = output.argmax(dim=1, keepdim=True)
-            loss += self.criterion(output, target).sum()
-            correct += pred.eq(target.view_as(pred)).sum()
-        loss /= len(dataloader.dataset)
-        accuracy = 100. * correct / len(dataloader.dataset)
-        return loss.item(), accuracy.item()
+            loss = self.criterion(output, target).mean()
+            stats["loss"].append(loss.detach())
+            stats["t1acc"].append(calculate_accuracy(output, target))
+            stats["t5acc"].append(calculate_accuracy(output, target, k=5))
+        stats["loss"] = torch.stack(stats["loss"]).mean().item()
+        stats["t1acc"] = torch.stack(stats["t1acc"]).mean().item()
+        stats["t5acc"] = torch.stack(stats["t5acc"]).mean().item()
+        return stats
 
     @torch.no_grad()
     def filter_noisy(self, dataset):
