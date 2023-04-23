@@ -2,6 +2,7 @@ import torch
 import torchvision
 import numpy as np
 from typing import Tuple, Any
+import os
 
 
 class Categorical(torch.distributions.Categorical):
@@ -219,4 +220,89 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
             'image': img,
             'target': target,
             'target_gt': self.targets_gt[index],
+        }
+
+
+from torchvision.datasets.utils import download_and_extract_archive, check_integrity
+
+class CIFAR10N(torchvision.datasets.CIFAR10):
+    """
+    Learning with Noisy Labels Revisited: A Study Using Real-World Human Annotations. (ICLR2022)
+    Re-annotation of the CIFAR-10/100 data which contains real-world human annotation errors.
+    """
+    cifarn_url = 'http://www.yliuu.com/web-cifarN/files/CIFAR-N-1.zip'
+    md5 = '666bf3cff3a944c245f2b6f62af4b919'
+    filename = 'CIFAR-10_human.pt'
+
+    def __init__(
+            self,
+            root: str,
+            train: bool = True,
+            transform = None,
+            target_transform = None,
+            download: bool = False,
+            noise_type: str = "worse_label",
+            ) -> None:
+        super().__init__(root, train=train, transform=transform,
+            target_transform=target_transform, download=download)
+        assert noise_type in ['clean_label', 'worse_label', 'aggre_label', 'random_label1', 'random_label2', 'random_label3']
+        self.noise_type = noise_type
+
+        if download:
+            if check_integrity(os.path.join(self.root, 'CIFAR-N-1.zip'), self.md5):
+                print('Files already downloaded and verified')
+            else:
+                download_and_extract_archive(self.cifarn_url, root, md5=self.md5)
+
+        noise_file = torch.load(os.path.join(self.root, 'CIFAR-N', self.filename), map_location=torch.device('cpu'))
+        self.targets_gt = noise_file['clean_label']
+        self.targets = noise_file[self.noise_type]
+
+    def __getitem__(self, index: int):
+        img, target = super().__getitem__(index)
+        return {
+            "image": img,
+            "target": target,
+            "target_gt": self.targets_gt[index],
+        }
+
+
+class CIFAR100N(torchvision.datasets.CIFAR100):
+    """
+    Learning with Noisy Labels Revisited: A Study Using Real-World Human Annotations. (ICLR2022)
+    Re-annotation of the CIFAR-10/100 data which contains real-world human annotation errors.
+    """
+    cifarn_url = 'http://www.yliuu.com/web-cifarN/files/CIFAR-N-1.zip'
+    md5 = '666bf3cff3a944c245f2b6f62af4b919'
+    filename = 'CIFAR-100_human.pt'
+
+    def __init__(
+            self,
+            root: str,
+            train: bool = True,
+            transform = None,
+            target_transform = None,
+            download: bool = False,
+            ) -> None:
+        super().__init__(root, train=train, transform=transform,
+            target_transform=target_transform, download=download)
+
+        if download:
+            if check_integrity(os.path.join(self.root, 'CIFAR-N-1.zip'), self.md5):
+                print('Files already downloaded and verified')
+            else:
+                download_and_extract_archive(self.cifarn_url, root, md5=self.md5)
+
+        noise_file = torch.load(os.path.join(self.root, 'CIFAR-N', self.filename), map_location=torch.device('cpu'))
+        self.targets_gt = noise_file['clean_label']
+        self.targets = noise_file['noisy_label']
+        self.clean_coarse_label = noise_file['clean_coarse_label']
+        self.noisy_coarse_label = noise_file['noisy_coarse_label']
+
+    def __getitem__(self, index: int):
+        img, target = super().__getitem__(index)
+        return {
+            "image": img,
+            "target": target,
+            "target_gt": self.targets_gt[index],
         }
