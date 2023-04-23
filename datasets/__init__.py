@@ -1,1 +1,1 @@
-from .cifar import CIFAR10, CIFAR100, NoisyCIFAR10, NoisyCIFAR100
+from .cifar import CIFAR10, CIFAR100, NoisyCIFAR10, NoisyCIFAR100, CIFAR10N, CIFAR100N
