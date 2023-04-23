@@ -3,6 +3,7 @@ import torchvision
 import numpy as np
 from typing import Tuple, Any
 import os
+from torchvision.datasets.utils import download_and_extract_archive, check_integrity
 
 
 class Categorical(torch.distributions.Categorical):
@@ -222,8 +223,6 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
             'target_gt': self.targets_gt[index],
         }
 
-
-from torchvision.datasets.utils import download_and_extract_archive, check_integrity
 
 class CIFAR10N(torchvision.datasets.CIFAR10):
     """
