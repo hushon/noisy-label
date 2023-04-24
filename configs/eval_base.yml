@@ -1,0 +1,35 @@
+data: # test dataset?
+  dataset: noisy_cifar10
+  noise_rate: 0.2
+  noise_type: symmetric
+  random_seed: 42
+
+
+# model:
+#   architecture: resnet18 # must be same as artifact.metadata (uploaded in wandb)
+#   num_classes: 10
+
+wandb:
+  mode: online # "disabled" or "online"
+  entity: seunghee1215
+  project: noisy-label
+  name: eval_base_epoch19
+
+model_restoration:
+  mode: artifact # "artifact" or "file" # TODO: local
+  # mode: file # "artifact" or "file" # TODO: local
+  artifact_name: seunghee1215/noisy-label/checkpoints:v1
+  # file_run_path: seunghee1215/noisy-label/ws18aor2 # "<entity>/<project>/<run_id>" 
+  epoch: 19
+trainer:
+  optimizer: sgd
+  init_lr: 1.0e-1
+  momentum: 0.9
+  weight_decay: 1.0e-4
+  lr_scheduler: multistep
+  max_epoch: 200
+  loss_fn: mae 
+  num_classes: 10
+  num_workers: 2
+  batch_size: 128
+  save_model: true
