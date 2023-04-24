@@ -4,7 +4,8 @@ import torch.nn.functional as F
 import torch.utils.data
 import tqdm.auto as tqdm
 import os
-
+import wandb
+import pdb
 
 class MeanAbsoluteError(torch.nn.Module):
     def __init__(self, reduction="mean"):
@@ -95,6 +96,10 @@ class Trainer:
 
         optimizer = self.get_optimizer(self.model)
         lr_scheduler = self.get_lr_scheduler(optimizer)
+        # artifact = wandb.Artifact(f'checkpoints_{self.wandb_run.id}',
+        artifact = wandb.Artifact(f'checkpoints',
+                                  type='model',
+                                  metadata=self.wandb_run.config['model'])
 
         for epoch in tqdm.trange(self.config["max_epoch"]):
             train_stats = {
@@ -130,7 +135,8 @@ class Trainer:
             if self.config["save_model"] and (epoch+1)%10 == 0:
                 filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
                 torch.save(self.model.state_dict(), filepath)
-                self.wandb_run.save(filepath)
+                artifact.add_file(filepath)
+        self.wandb_run.log_artifact(artifact)
 
     @torch.no_grad()
     def _evaluate(self, dataloader):
