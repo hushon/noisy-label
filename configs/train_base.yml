@@ -2,6 +2,7 @@ data:
   dataset: noisy_cifar10
   noise_rate: 0.2
   noise_type: symmetric
+  random_seed: 42
 
 model:
   architecture: resnet18
@@ -11,6 +12,7 @@ wandb:
   mode: disabled # "disabled" or "online"
   entity: siit-iitp
   project: noisy-label
+  name: temp
 
 trainer:
   optimizer: sgd
