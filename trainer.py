@@ -33,7 +33,7 @@ class MeanAbsoluteError(torch.nn.Module):
 
 
 class Trainer:
-    def __init__(self, model, config, wandb_run=None):
+    def __init__(self, model: nn.Module, config: dict, wandb_run=None):
         self.model = model.cuda()
         self.config = config
         self.wandb_run = wandb_run
