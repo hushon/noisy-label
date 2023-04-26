@@ -1,5 +1,11 @@
 # noisy-label
 
+## Setting up
+
+```bash
+docker pull hushon/pytorch:2.0
+```
+
 ## Run training
 
 ```bash
