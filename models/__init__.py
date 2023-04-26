@@ -1,7 +1,9 @@
+from torch import nn
 from .resnet import resnet18, resnet34, resnet50, resnet101, resnet152
+from .module import MCDropout, GaussianDropout, GaussianMCDropout
 
 
-def get_model(architecture, num_classes):
+def get_model(architecture, num_classes) -> nn.Module:
     if architecture == "resnet18":
         return resnet18(pretrained=False, in_channels=3, num_classes=num_classes)
     elif architecture == "resnet34":
