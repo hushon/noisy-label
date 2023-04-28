@@ -1,8 +1,9 @@
 from .cifar import CIFAR10, CIFAR100, NoisyCIFAR10, NoisyCIFAR100, CIFAR10N, CIFAR100N
+from .food101 import Food101
+from animal import Animal10N
 from torchvision import transforms
 from typing import Tuple
 import torch.utils.data as data
-
 
 
 def get_dataset(dataset, noise_rate, noise_type, random_seed) -> Tuple[data.Dataset, data.Dataset]:
