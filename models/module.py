@@ -38,11 +38,11 @@ class GaussianDropout(nn.Module):
         super().__init__()
         assert 0.0 <= p <= 1.0
         self.p = p
+        self.std = (self.p / (1.0 - self.p))**0.5
 
     def forward(self, x):
         if self.training:
-            stddev = (self.p / (1.0 - self.p))**0.5
-            epsilon = torch.randn_like(x) * stddev
+            epsilon = torch.rand_like(x).mul_(self.std)
             return x * epsilon
         else:
             return x
@@ -50,6 +50,5 @@ class GaussianDropout(nn.Module):
 
 class GaussianMCDropout(GaussianDropout):
     def forward(self, x):
-        stddev = (self.p / (1.0 - self.p))**0.5
-        epsilon = torch.randn_like(x) * stddev
+        epsilon = torch.rand_like(x).mul_(self.std)
         return x * epsilon
