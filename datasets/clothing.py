@@ -12,7 +12,7 @@ class Clothing1M(torchvision.datsets.ImageFolder):
         train: bool = True,
         transform = None,
         target_transform = None
-        split: bool = ''
+        split: str = ''
         ) -> None: # No download, noise_type
         """
             Directory structure is different from Clothing1M official version..
