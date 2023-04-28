@@ -10,7 +10,8 @@ import yaml
 from trainer import Trainer
 import pprint
 from torchvision import transforms
-import datasets
+from datasets import get_dataset
+from models import get_model
 
 
 np.random.seed(0)
@@ -22,42 +23,6 @@ torch.backends.cudnn.benchmark = True
 parser = argparse.ArgumentParser(description='Training Config', add_help=False)
 parser.add_argument('--config', type=str, required=True, help="./configs/train_base.yml")
 args = parser.parse_args()
-
-def get_dataset(dataset, noise_rate, noise_type, random_seed):
-    transform_train = transforms.Compose([
-        transforms.RandomCrop(32, padding=4),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    ])
-    transform_test = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    ])
-    if dataset == "noisy_cifar10":
-        train = datasets.NoisyCIFAR10("./data", download=True, transform=transform_train, noise_rate=noise_rate, noise_type=noise_type, random_seed=random_seed)
-        test = datasets.CIFAR10("./data", download=True, train=False, transform=transform_test)
-    elif dataset == "noisy_cifar100":
-        train = datasets.NoisyCIFAR100("./data", download=True, transform=transform_train, noise_rate=noise_rate, noise_type=noise_type, random_seed=random_seed)
-        test = datasets.CIFAR100("./data", download=True, train=False, transform=transform_test)
-    else:
-        raise NotImplementedError
-    return train, test
-
-
-def get_model(architecture, num_classes):
-    if architecture == "resnet18":
-        return resnet.resnet18(pretrained=False, in_channels=3, num_classes=num_classes)
-    elif architecture == "resnet34":
-        return resnet.resnet34(pretrained=False, in_channels=3, num_classes=num_classes)
-    elif architecture == "resnet50":
-        return resnet.resnet50(pretrained=False, in_channels=3, num_classes=num_classes)
-    elif architecture == "resnet101":
-        return resnet.resnet101(pretrained=False, in_channels=3, num_classes=num_classes)
-    elif architecture == "resnet152":
-        return resnet.resnet152(pretrained=False, in_channels=3, num_classes=num_classes)
-    else:
-        raise NotImplementedError
 
 
 def main():
