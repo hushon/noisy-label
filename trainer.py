@@ -5,12 +5,13 @@ import torch.utils.data
 import tqdm.auto as tqdm
 import os
 import wandb
+from wandb.sdk.wandb_run import Run
 import pdb
 from models import MeanAbsoluteError
 
 
 class Trainer:
-    def __init__(self, model: nn.Module, config: dict, wandb_run=None):
+    def __init__(self, model: nn.Module, config: dict, wandb_run: Run =None):
         self.model = model.cuda()
         self.config = config
         self.wandb_run = wandb_run
