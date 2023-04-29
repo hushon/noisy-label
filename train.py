@@ -21,7 +21,7 @@ torch.backends.cudnn.benchmark = True
 
 
 parser = argparse.ArgumentParser(description='Training Config', add_help=False)
-parser.add_argument('--config', type=str, required=True, help="./configs/train_base.yml")
+parser.add_argument('--config', type=str, required=True, help="./configs/train_base.yaml")
 args = parser.parse_args()
 
 
@@ -35,6 +35,7 @@ def main():
         **config['wandb'],
         config=config,
     )
+    wandb_run.log_code()
 
     train_dataset, test_dataset = get_dataset(**config["data"])
 
