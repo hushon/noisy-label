@@ -5,18 +5,21 @@ import torch.utils.data
 import tqdm.auto as tqdm
 import os
 import wandb
+from wandb.sdk.wandb_run import Run
 import pdb
 from models import MeanAbsoluteError
 
 
 class Trainer:
-    def __init__(self, model: nn.Module, config: dict, wandb_run=None):
+    def __init__(self, model: nn.Module, config: dict, wandb_run: Run =None):
         self.model = model.cuda()
         self.config = config
         self.wandb_run = wandb_run
         self.criterion = self.get_loss_fn().cuda()
 
-    def get_optimizer(self, model) -> torch.optim.Optimizer:
+    def get_optimizer(self,
+                      model: nn.Module
+                      ) -> torch.optim.Optimizer:
         if self.config["optimizer"] == "sgd":
             return torch.optim.SGD(
                 model.parameters(),
@@ -33,7 +36,9 @@ class Trainer:
         else:
             raise NotImplementedError
 
-    def get_lr_scheduler(self, optimizer) -> torch.optim.lr_scheduler.LRScheduler:
+    def get_lr_scheduler(self,
+                         optimizer: torch.optim.Optimizer
+                         ) -> torch.optim.lr_scheduler.LRScheduler:
         if self.config["lr_scheduler"] == "cosine":
             return torch.optim.lr_scheduler.CosineAnnealingLR(
                 optimizer,
@@ -58,7 +63,10 @@ class Trainer:
         else:
             raise NotImplementedError
 
-    def get_dataloader(self, dataset, train=True):
+    def get_dataloader(self,
+                       dataset: torch.utils.data.Dataset,
+                       train=True
+                       ) -> torch.utils.data.DataLoader:
         return torch.utils.data.DataLoader(
             dataset,
             batch_size=self.config["batch_size"],
@@ -116,7 +124,9 @@ class Trainer:
         self.wandb_run.log_artifact(artifact)
 
     @torch.no_grad()
-    def _evaluate(self, dataloader):
+    def _evaluate(self,
+                  dataloader: torch.utils.data.DataLoader
+                  ) -> dict:
         self.model.eval()
         stats = {
             "loss": [],
@@ -155,7 +165,7 @@ class Trainer:
 
             score_list.append(score)
             is_noisy_list.append(is_noisy)
-        
+
         score = torch.cat(score_list, dim=0).cpu()
         is_noisy = torch.cat(is_noisy_list, dim=0).cpu()
         return {
@@ -165,7 +175,7 @@ class Trainer:
 
 
 @torch.no_grad()
-def calculate_accuracy(output, target, k=1):
+def calculate_accuracy(output: torch.Tensor, target: torch.Tensor, k=1):
     """Computes top-k accuracy"""
     pred = torch.topk(output, k, 1, True, True).indices
     correct = pred.eq(target[..., None].expand_as(pred)).any(dim=1)
