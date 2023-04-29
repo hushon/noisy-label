@@ -33,7 +33,7 @@ class Animal10N(torch.utils.data.Dataset):
         self.root = root
         if download:
             self._download()
-        self.image_dir = os.path.join(self.root, f'{split}ing')
+        self.image_dir = os.path.join(self.root, 'animal-10n', f'{split}ing')
         self.image_files = [f for f in os.listdir(self.image_dir) if os.path.isfile(os.path.join(self.image_dir, f))]
 
         self.targets = []
