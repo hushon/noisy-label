@@ -13,6 +13,7 @@ wandb:
   entity: siit-iitp
   project: noisy-label
   name: NoisyCIFAR100(symm,0.2)-CE
+  save_code: true
 
 trainer:
   optimizer: sgd

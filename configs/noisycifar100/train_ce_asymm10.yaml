@@ -1,6 +1,6 @@
 data:
   dataset: noisy_cifar100
-  noise_rate: 0.6
+  noise_rate: 0.1
   noise_type: symmetric
   random_seed: 42
 
@@ -12,7 +12,8 @@ wandb:
   mode: online # "disabled" or "online"
   entity: siit-iitp
   project: noisy-label
-  name: NoisyCIFAR100(symm,0.6)-CE
+  name: NoisyCIFAR100(symm,0.2)-CE
+  save_code: true
 
 trainer:
   optimizer: sgd

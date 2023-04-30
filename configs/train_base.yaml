@@ -1,7 +1,8 @@
 data:
   dataset: noisy_cifar10
-  noise_rate: 0.6
+  noise_rate: 0.2
   noise_type: symmetric
+  random_seed: 42
 
 model:
   architecture: resnet18
@@ -11,6 +12,8 @@ wandb:
   mode: online # "disabled" or "online"
   entity: siit-iitp
   project: noisy-label
+  name: temp
+  save_code: true
 
 trainer:
   optimizer: sgd
@@ -19,7 +22,7 @@ trainer:
   weight_decay: 1.0e-4
   lr_scheduler: multistep
   max_epoch: 200
-  loss_fn: cross_entropy
+  loss_fn: mae
   num_workers: 2
   batch_size: 128
   save_model: true

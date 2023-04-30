@@ -11,7 +11,7 @@ data: # test dataset?
 
 wandb:
   mode: online # "disabled" or "online"
-  entity: seunghee1215
+  entity: siit-iitp
   project: noisy-label
   name: eval_base_epoch19
 
