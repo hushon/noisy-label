@@ -1,0 +1,61 @@
+wandb_version: 1
+
+data:
+  desc: null
+  value:
+    dataset: noisy_cifar10
+    noise_rate: 0.4
+    noise_type: symmetric
+model:
+  desc: null
+  value:
+    architecture: resnet18
+    num_classes: 10
+wandb:
+  desc: null
+  value:
+    mode: online
+    entity: siit-iitp
+    project: noisy-label
+trainer:
+  desc: null
+  value:
+    optimizer: sgd
+    init_lr: 0.1
+    momentum: 0.9
+    weight_decay: 0.0001
+    lr_scheduler: multistep
+    max_epoch: 200
+    loss_fn: cross_entropy
+    num_workers: 2
+    batch_size: 128
+    save_model: true
+_wandb:
+  desc: null
+  value:
+    python_version: 3.10.9
+    cli_version: 0.14.2
+    framework: torch
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1682137365.388302
+    t:
+      1:
+      - 1
+      - 41
+      - 51
+      - 55
+      2:
+      - 1
+      - 41
+      - 51
+      - 55
+      3:
+      - 2
+      - 3
+      - 16
+      - 23
+      4: 3.10.9
+      5: 0.14.2
+      8:
+      - 5
