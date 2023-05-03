@@ -314,7 +314,7 @@ class NoisyCIFAR3(torchvision.datasets.CIFAR10):
     """
     cifar3_classes = {
         'animal': ['deer', 'dog', 'horse'],
-        'inanimal': ['automobile', 'ship', 'truck'],
+        'vehicle': ['automobile', 'ship', 'truck'],
     }
 
     def __init__(
@@ -331,7 +331,7 @@ class NoisyCIFAR3(torchvision.datasets.CIFAR10):
         super().__init__(root, train=train, transform=transform,
             target_transform=target_transform, download=download)
         assert 0.0 <= noise_rate <= 1.0
-        assert class_type in ['animal', 'inanimal']
+        assert class_type in ['animal', 'vehicle']
 
         self.data = np.array(self.data)
         self.targets = np.array(self.targets)
