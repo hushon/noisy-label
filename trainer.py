@@ -109,7 +109,7 @@ class Trainer:
             train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
 
             val_stats = self._evaluate(val_dataloader)
-            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t5acc']:.2f}")
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
             self.wandb_run.log(
                 {
                     "learning_rate": lr_scheduler.get_last_lr()[0],
@@ -177,6 +177,7 @@ class Trainer:
 @torch.no_grad()
 def calculate_accuracy(output: torch.Tensor, target: torch.Tensor, k=1):
     """Computes top-k accuracy"""
+    k = min(k, output.size(-1))
     pred = torch.topk(output, k, 1, True, True).indices
     correct = pred.eq(target[..., None].expand_as(pred)).any(dim=1)
     accuracy = correct.float().mean().mul(100.0)

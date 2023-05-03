@@ -1,18 +1,18 @@
 data:
-  dataset: noisy_cifar100
-  noise_rate: 0.2
-  noise_type: symmetric
-  random_seed: 42
+  dataset: noisy_cifar3
+  noise_rate: 0.5
+  class_type: animal
 
 model:
   architecture: resnet18
-  num_classes: 100
+  num_classes: 3
 
 wandb:
   mode: online # "disabled" or "online"
   entity: siit-iitp
   project: noisy-label
-  name: NoisyCIFAR100(symm,0.2)-CE
+  name: NoisyCIFAR3(symm,0.5,animal)-CE
+  save_code: true
 
 trainer:
   optimizer: sgd

@@ -305,3 +305,70 @@ class CIFAR100N(torchvision.datasets.CIFAR100):
             "target": target,
             "target_gt": self.targets_gt[index],
         }
+
+
+class NoisyCIFAR3(torchvision.datasets.CIFAR10):
+    """
+    CIFAR-3 Dataset with synthetic label noise.
+    Symmetric noise only. For visualization purposes.
+    """
+    cifar3_classes = {
+        'animal': ['deer', 'dog', 'horse'],
+        'vehicle': ['automobile', 'ship', 'truck'],
+    }
+
+    def __init__(
+            self,
+            root: str,
+            train: bool = True,
+            transform = None,
+            target_transform = None,
+            download: bool = False,
+            noise_rate: float = 0.2,
+            class_type: str = 'animal',
+            random_seed: int = 42,
+            ) -> None:
+        super().__init__(root, train=train, transform=transform,
+            target_transform=target_transform, download=download)
+        assert 0.0 <= noise_rate <= 1.0
+        assert class_type in ['animal', 'vehicle']
+
+        self.data = np.array(self.data)
+        self.targets = np.array(self.targets)
+        self.noise_rate = noise_rate
+        self.class_type = class_type
+        self.rng = torch.Generator().manual_seed(random_seed)
+
+        self._filter_cifar10()
+        if self.train:
+            self.transition_matrix = self._symmetric_transition_matrix(noise_rate)
+            self._inject_label_noise(self.transition_matrix)
+
+    def _filter_cifar10(self):
+        cifar10_classes = self.classes
+        self.classes = self.cifar3_classes[self.class_type]
+        self.class_to_idx = {c: i for i, c in enumerate(self.classes)}
+        class_ids = [cifar10_classes.index(c) for c in self.classes]
+        filter_idx = np.isin(self.targets, class_ids)
+        self.data = self.data[filter_idx]
+        self.targets = self.targets[filter_idx]
+        self.targets = np.array([self.class_to_idx[cifar10_classes[t]] for t in self.targets])
+
+    @staticmethod
+    def _symmetric_transition_matrix(noise_rate) -> np.ndarray:
+        transition_matrix = np.full((3, 3), noise_rate / (3 - 1))
+        np.fill_diagonal(transition_matrix, 1.0 - noise_rate)
+        return transition_matrix
+
+    def _inject_label_noise(self, transition_matrix):
+        self.targets_gt = self.targets.copy()
+        out_dist = transition_matrix[self.targets_gt]
+        self.targets = Categorical(torch.tensor(out_dist)).sample(generator=self.rng).numpy()
+
+    def __getitem__(self, index):
+        img, target = super().__getitem__(index)
+        return {
+            'image': img,
+            'target': target,
+            'target_gt': self.targets_gt[index] if self.train else target,
+        }
