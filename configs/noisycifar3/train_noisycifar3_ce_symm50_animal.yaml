@@ -2,6 +2,8 @@ data:
   dataset: noisy_cifar3
   noise_rate: 0.5
   class_type: animal
+  random_seed: 42
+  download: true
 
 model:
   architecture: resnet18

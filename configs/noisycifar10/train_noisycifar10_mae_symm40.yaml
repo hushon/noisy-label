@@ -2,6 +2,8 @@ data:
   dataset: noisy_cifar10
   noise_rate: 0.4
   noise_type: symmetric
+  random_seed: 42
+  download: true
 
 model:
   architecture: resnet18
