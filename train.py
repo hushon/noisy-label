@@ -35,6 +35,7 @@ def main():
         **config['wandb'],
         config=config,
     )
+    wandb_run.save(args.config)
     wandb_run.log_code()
 
     train_dataset, test_dataset = get_dataset(**config["data"])

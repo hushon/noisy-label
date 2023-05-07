@@ -1,6 +1,6 @@
 data:
   dataset: noisy_cifar3
-  noise_rate: 0.8
+  noise_rate: 0.1
   class_type: vehicle
   random_seed: 42
   download: true
@@ -13,7 +13,7 @@ wandb:
   mode: online # "disabled" or "online"
   entity: siit-iitp
   project: noisy-label
-  name: NoisyCIFAR3(0.8,vehicle)-CE
+  name: NoisyCIFAR3(0.1,vehicle)-CE
   save_code: true
 
 trainer:
