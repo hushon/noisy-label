@@ -2,13 +2,15 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.data
+from torch.utils.data import Dataset
 import tqdm.auto as tqdm
 import os
 import wandb
 from wandb.sdk.wandb_run import Run
 import pdb
 from models import MeanAbsoluteError
-
+from torchvision import transforms
+import numpy as np
 
 class Trainer:
     def __init__(self, model: nn.Module, config: dict, wandb_run: Run =None):
@@ -123,6 +125,146 @@ class Trainer:
                 artifact.add_file(filepath)
         self.wandb_run.log_artifact(artifact)
 
+    def distill(self, train_dataset: Dataset, val_dataset: Dataset, teacher_model: nn.Module):
+        train_dataset.transform = transforms.Compose([
+            transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1)),
+        ]) # output is a (3, 32, 32) uint8 tensor
+        transform_teacher = transforms.Compose([
+            transforms.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+            transforms.Lambda(lambda x: x/255.0),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ])
+        transform_student = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.Lambda(lambda x: x/255.0),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ])
+
+        train_dataloader = self.get_dataloader(train_dataset, train=True)
+        val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        optimizer = self.get_optimizer(self.model)
+        lr_scheduler = self.get_lr_scheduler(optimizer)
+
+        criterion = nn.KLDivLoss(reduction='batchmean')
+        temp = 2.0 # distillation temperature
+
+        teacher_model = torch.jit.script(teacher_model)
+
+        for epoch in tqdm.trange(self.config["max_epoch"]):
+            train_stats = {
+                "loss": [],
+                "t1acc": [],
+                "t5acc": [],
+            }
+            self.model.train()
+            teacher_model.eval() # 이거 train 으로 두면 성능 더 오를듯?
+            for batch in train_dataloader:
+                data, target = batch["image"].cuda(), batch["target"].cuda()
+                with torch.no_grad():
+                    target_soft = teacher_model(transform_teacher(data)).div_(temp).softmax(-1)
+                output = self.model(transform_student(data))
+                loss = criterion(output.log_softmax(-1), target_soft)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                train_stats["loss"].append(loss.detach())
+                train_stats["t1acc"].append(calculate_accuracy(output, target))
+                train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
+            lr_scheduler.step()
+            train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
+            train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
+            train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
+
+            val_stats = self._evaluate(val_dataloader)
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
+            self.wandb_run.log(
+                {
+                    "learning_rate": lr_scheduler.get_last_lr()[0],
+                    **{'train_'+k: v for k, v in train_stats.items()},
+                    **{'val_'+k: v for k, v in val_stats.items()},
+                }
+            )
+            if self.config["save_model"] and (epoch+1)%10 == 0:
+                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
+                torch.save(self.model.state_dict(), filepath)
+                self.wandb_run.save(filepath)
+
+    def distill_online(self, train_dataset: Dataset, val_dataset: Dataset):
+        train_dataset.transform = transforms.Compose([
+            transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1)),
+        ]) # output is a (3, 32, 32) uint8 tensor
+        transform_teacher = transforms.Compose([
+            transforms.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+            transforms.Lambda(lambda x: x/255.0),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ])
+        transform_student = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.Lambda(lambda x: x/255.0),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ])
+
+        # transform_teacher = torch.jit.script(transform_teacher)
+        # transform_student = torch.jit.script(transform_student)
+        # self.model = torch.jit.script(self.model)
+
+        train_dataloader = self.get_dataloader(train_dataset, train=True)
+        val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        optimizer = self.get_optimizer(self.model)
+        lr_scheduler = self.get_lr_scheduler(optimizer)
+
+        temp = 1.0 # distillation temperature
+
+
+        for epoch in tqdm.trange(self.config["max_epoch"]):
+            train_stats = {
+                "loss": [],
+                "t1acc": [],
+                "t5acc": [],
+            }
+            self.model.train()
+            for batch in train_dataloader:
+                data, target = batch["image"].cuda(), batch["target"].cuda()
+                with torch.no_grad():
+                    output_autoaugment = self.model(transform_teacher(data))
+                output_randomcrop = self.model(transform_student(data))
+
+                # compute CE loss
+                ce_loss = F.cross_entropy(output_randomcrop, target, reduction='mean')
+                # compute KL loss
+                kl_loss = F.kl_div(output_randomcrop.log_softmax(-1), output_autoaugment.div_(temp).softmax(-1), reduction='batchmean') * temp * temp + ce_loss
+                loss = (ce_loss + kl_loss)*0.5
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                train_stats["loss"].append(loss.detach())
+                train_stats["t1acc"].append(calculate_accuracy(output_randomcrop, target))
+                train_stats["t5acc"].append(calculate_accuracy(output_randomcrop, target, k=5))
+            lr_scheduler.step()
+            train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
+            train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
+            train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
+
+            val_stats = self._evaluate(val_dataloader)
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
+            self.wandb_run.log(
+                {
+                    "learning_rate": lr_scheduler.get_last_lr()[0],
+                    **{'train_'+k: v for k, v in train_stats.items()},
+                    **{'val_'+k: v for k, v in val_stats.items()},
+                }
+            )
+            if self.config["save_model"] and (epoch+1)%10 == 0:
+                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
+                torch.save(self.model.state_dict(), filepath)
+                self.wandb_run.save(filepath)
+
+
     @torch.no_grad()
     def _evaluate(self,
                   dataloader: torch.utils.data.DataLoader
@@ -177,7 +319,7 @@ class Trainer:
 @torch.no_grad()
 def calculate_accuracy(output: torch.Tensor, target: torch.Tensor, k=1):
     """Computes top-k accuracy"""
-    k = min(k, output.size(-1))
+    k = min(k, output.size(-1)) # in case num_classes is smaller than k.
     pred = torch.topk(output, k, 1, True, True).indices
     correct = pred.eq(target[..., None].expand_as(pred)).any(dim=1)
     accuracy = correct.float().mean().mul(100.0)
