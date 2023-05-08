@@ -78,6 +78,21 @@ class Trainer:
         )
 
     def fit(self, train_dataset, val_dataset):
+        train_dataset.transform = transforms.Compose([
+            transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1)),
+        ]) # output is a (3, 32, 32) uint8 tensor
+        transform_train = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.Lambda(lambda x: x/255.0),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ])
+        transform_teacher = transforms.Compose([
+            transforms.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+            transforms.Lambda(lambda x: x/255.0),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ])
+
         train_dataloader = self.get_dataloader(train_dataset, train=True)
         val_dataloader = self.get_dataloader(val_dataset, train=False)
 
@@ -97,8 +112,20 @@ class Trainer:
             self.model.train()
             for batch in train_dataloader:
                 data, target = batch["image"].cuda(), batch["target"].cuda()
-                output = self.model(data)
-                loss = self.criterion(output, target).mean()
+                output = self.model(transform_train(data))
+                if not self.config['online_distill']:
+                    loss = self.criterion(output, target).mean()
+                else:
+                    with torch.no_grad():
+                        output_strongaug = self.model(transform_teacher(data))
+                    ce_loss = self.criterion(output, target).mean()
+                    kl_loss = (self.config['temperature'] ** 2) * F.kl_div(
+                        output.div(self.config['temperature']).log_softmax(-1),
+                        output_strongaug.div_(self.config['temperature']).softmax(-1),
+                        reduction='batchmean'
+                        )
+                    loss = (ce_loss + kl_loss)*0.5
+
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -147,8 +174,7 @@ class Trainer:
         optimizer = self.get_optimizer(self.model)
         lr_scheduler = self.get_lr_scheduler(optimizer)
 
-        criterion = nn.KLDivLoss(reduction='batchmean')
-        temp = 1.0 # distillation temperature
+        temp = self.config['temperature'] # distillation temperature
 
         teacher_model = torch.jit.script(teacher_model)
 
@@ -163,9 +189,13 @@ class Trainer:
             for batch in train_dataloader:
                 data, target = batch["image"].cuda(), batch["target"].cuda()
                 with torch.no_grad():
-                    target_soft = teacher_model(transform_teacher(data))
+                    output_teacher = teacher_model(transform_teacher(data))
                 output = self.model(transform_student(data))
-                loss = F.kl_div(output.log_softmax(-1), target_soft.div_(temp).softmax(-1), reduction='batchmean')
+                loss = (self.config['temperature'] ** 2) * F.kl_div(
+                    output.div(self.config['temperature']).log_softmax(-1),
+                    output_teacher.div_(self.config['temperature']).softmax(-1),
+                    reduction='batchmean'
+                    )
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -191,87 +221,6 @@ class Trainer:
                 filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
                 torch.save(self.model.state_dict(), filepath)
                 self.wandb_run.save(filepath)
-
-    def distill_online(self, train_dataset: Dataset, val_dataset: Dataset):
-
-        train_dataset.transform = transforms.Compose([
-            transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1)),
-        ]) # output is a (3, 32, 32) uint8 tensor
-        transform_teacher = transforms.Compose([
-            transforms.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
-            transforms.Lambda(lambda x: x/255.0),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-            # transforms.Normalize([125.307 , 122.961 , 113.8575], [ 51.5865,  50.847 ,  51.255 ])
-        ])
-        transform_student = transforms.Compose([
-            transforms.RandomCrop(32, padding=[4,4]),
-            transforms.RandomHorizontalFlip(),
-            transforms.Lambda(lambda x: x/255.0),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-            # transforms.Normalize([125.307 , 122.961 , 113.8575], [ 51.5865,  50.847 ,  51.255 ])
-        ])
-
-        # transform_teacher = torch.jit.script(transform_teacher)
-        # transform_student = torch.jit.script(transform_student)
-        # self.model = torch.jit.script(self.model)
-
-        train_dataloader = self.get_dataloader(train_dataset, train=True)
-        val_dataloader = self.get_dataloader(val_dataset, train=False)
-
-        optimizer = self.get_optimizer(self.model)
-        lr_scheduler = self.get_lr_scheduler(optimizer)
-
-        temp = 1.0 # distillation temperature
-
-
-        for epoch in tqdm.trange(self.config["max_epoch"]):
-            train_stats = {
-                "loss": [],
-                "t1acc": [],
-                "t5acc": [],
-            }
-            self.model.train()
-            for batch in train_dataloader:
-                data, target = batch["image"].cuda(), batch["target"].cuda()
-                with torch.no_grad():
-                    output_autoaugment = self.model(transform_teacher(data))
-                output_randomcrop = self.model(transform_student(data))
-
-                # compute CE loss
-                ce_loss = self.criterion(output_randomcrop, target).mean()
-                # compute KL loss
-                kl_loss = (temp ** 2) * F.kl_div(
-                    output_randomcrop.log_softmax(-1),
-                    output_autoaugment.div_(temp).softmax(-1),
-                    reduction='batchmean'
-                    )
-                loss = (ce_loss + kl_loss)*0.5
-
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                train_stats["loss"].append(loss.detach())
-                train_stats["t1acc"].append(calculate_accuracy(output_randomcrop, target))
-                train_stats["t5acc"].append(calculate_accuracy(output_randomcrop, target, k=5))
-            lr_scheduler.step()
-            train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
-            train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
-            train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
-
-            val_stats = self._evaluate(val_dataloader)
-            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
-            self.wandb_run.log(
-                {
-                    "learning_rate": lr_scheduler.get_last_lr()[0],
-                    **{'train_'+k: v for k, v in train_stats.items()},
-                    **{'val_'+k: v for k, v in val_stats.items()},
-                }
-            )
-            if self.config["save_model"] and (epoch+1)%10 == 0:
-                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
-                torch.save(self.model.state_dict(), filepath)
-                self.wandb_run.save(filepath)
-
 
     @torch.no_grad()
     def _evaluate(self,
@@ -332,12 +281,3 @@ def calculate_accuracy(output: torch.Tensor, target: torch.Tensor, k=1):
     correct = pred.eq(target[..., None].expand_as(pred)).any(dim=1)
     accuracy = correct.float().mean().mul(100.0)
     return accuracy
-
-
-class LambdaLayer(nn.Module):
-    def __init__(self, func):
-        super().__init__()
-        self.func = func
-
-    def forward(self, x):
-        return self.func(x)
