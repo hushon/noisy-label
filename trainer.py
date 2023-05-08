@@ -241,8 +241,9 @@ class Trainer:
                 ce_loss = self.criterion(output_randomcrop, target).mean()
                 # compute KL loss
                 kl_loss = (temp ** 2) * F.kl_div(
-                    output_randomcrop.log_softmax(-1), 
-                    output_autoaugment.div_(temp).softmax(-1), reduction='batchmean'
+                    output_randomcrop.log_softmax(-1),
+                    output_autoaugment.div_(temp).softmax(-1),
+                    reduction='batchmean'
                     )
                 loss = (ce_loss + kl_loss)*0.5
 
