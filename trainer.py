@@ -497,10 +497,10 @@ class Trainer:
 
 
 @torch.no_grad()
-def calculate_accuracy(output: torch.Tensor, target: torch.Tensor, k=1):
+def calculate_accuracy(prob: torch.Tensor, target: torch.Tensor, k=1):
     """Computes top-k accuracy"""
-    k = min(k, output.size(-1)) # in case num_classes is smaller than k.
-    pred = torch.topk(output, k, 1, True, True).indices
-    correct = pred.eq(target[..., None].expand_as(pred)).any(dim=1)
+    k = min(k, prob.size(-1)) # in case num_classes is smaller than k.
+    pred = torch.topk(prob, k, -1).indices
+    correct = pred.eq(target[..., None].expand_as(pred)).any(dim=-1)
     accuracy = correct.float().mean().mul(100.0)
     return accuracy

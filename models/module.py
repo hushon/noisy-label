@@ -4,14 +4,23 @@ import torch.nn.functional as F
 
 
 class MeanAbsoluteError(torch.nn.Module):
+    '''
+    Ghosh, Aritra, Himanshu Kumar, and P. Shanti Sastry.
+    "Robust loss functions under label noise for deep neural networks."
+    Proceedings of the AAAI conference on artificial intelligence.
+
+    Inputs:
+        pred: unnormalized logits
+        labels: target labels
+    '''
     def __init__(self, reduction="mean"):
         super().__init__()
         self.reduction = reduction
 
     def forward(self, pred, labels):
-        pred = F.softmax(pred, dim=1)
-        mae = 1. - torch.gather(pred, 1, labels.view(-1, 1))
-        mae = mae.squeeze(1)
+        pred = F.softmax(pred, dim=-1)
+        mae = 2 - 2*torch.gather(pred, -1, labels.view(-1, 1))
+        mae = mae.squeeze(-1)
         # Note: Reduced MAE
         # Original: torch.abs(pred - label_one_hot).sum(dim=1)
         # $MAE = \sum_{k=1}^{K} |\bm{p}(k|\bm{x}) - \bm{q}(k|\bm{x})|$
@@ -52,3 +61,12 @@ class GaussianMCDropout(GaussianDropout):
     def forward(self, x):
         epsilon = torch.rand_like(x).mul_(self.std)
         return x * epsilon
+
+
+class LambdaLayer(nn.Module):
+    def __init__(self, func):
+        super().__init__()
+        self.func = func
+
+    def forward(self, x):
+        return self.func(x)

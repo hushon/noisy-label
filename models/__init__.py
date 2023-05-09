@@ -1,6 +1,6 @@
 from torch import nn
 from .resnet import resnet18, resnet34, resnet50, resnet101, resnet152
-from .module import MCDropout, GaussianDropout, GaussianMCDropout, MeanAbsoluteError
+from .module import MCDropout, GaussianDropout, GaussianMCDropout, MeanAbsoluteError, LambdaLayer
 
 
 def get_model(architecture, num_classes) -> nn.Module:
