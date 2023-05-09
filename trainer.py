@@ -117,11 +117,11 @@ class Trainer:
                     loss = self.criterion(output, target).mean()
                 else:
                     with torch.no_grad():
-                        output_strongaug = self.model(transform_teacher(data))
+                        output_teacher = self.model(transform_teacher(data))
                     ce_loss = self.criterion(output, target).mean()
                     kl_loss = (self.config['temperature'] ** 2) * F.kl_div(
                         output.div(self.config['temperature']).log_softmax(-1),
-                        output_strongaug.div_(self.config['temperature']).softmax(-1),
+                        output_teacher.div_(self.config['temperature']).softmax(-1),
                         reduction='batchmean'
                         )
                     loss = (ce_loss + kl_loss)*0.5
@@ -174,8 +174,6 @@ class Trainer:
         optimizer = self.get_optimizer(self.model)
         lr_scheduler = self.get_lr_scheduler(optimizer)
 
-        temp = self.config['temperature'] # distillation temperature
-
         teacher_model = torch.jit.script(teacher_model)
 
         for epoch in tqdm.trange(self.config["max_epoch"]):
@@ -223,9 +221,7 @@ class Trainer:
                 self.wandb_run.save(filepath)
 
     @torch.no_grad()
-    def _evaluate(self,
-                  dataloader: torch.utils.data.DataLoader
-                  ) -> dict:
+    def _evaluate(self, dataloader: torch.utils.data.DataLoader) -> dict:
         self.model.eval()
         stats = {
             "loss": [],
@@ -271,6 +267,233 @@ class Trainer:
             'score': score,
             'is_noisy': is_noisy,
         }
+
+    def distill_online_ablation1(self, train_dataset, val_dataset):
+        '''
+        on-line distillation ablation
+        autoaugment removed, and input to both teach and student are same (RandomCrop)
+        This ablation is to show that KD alone is not good enough for noisy labels
+        '''
+        train_dataset.transform = transforms.Compose([
+            transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1)),
+        ]) # output is a (3, 32, 32) uint8 tensor
+        transform_train = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.Lambda(lambda x: x/255.0),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ])
+
+        train_dataloader = self.get_dataloader(train_dataset, train=True)
+        val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        optimizer = self.get_optimizer(self.model)
+        lr_scheduler = self.get_lr_scheduler(optimizer)
+        # artifact = wandb.Artifact(f'checkpoints_{self.wandb_run.id}',
+        artifact = wandb.Artifact(f'checkpoints',
+                                  type='model',
+                                  metadata=self.wandb_run.config['model'])
+
+        for epoch in tqdm.trange(self.config["max_epoch"]):
+            train_stats = {
+                "loss": [],
+                "t1acc": [],
+                "t5acc": [],
+            }
+            self.model.train()
+            for batch in train_dataloader:
+                data, target = batch["image"].cuda(), batch["target"].cuda()
+                data = transform_train(data)
+                self.model.train()
+                output = self.model(data)
+                with torch.no_grad():
+                    self.model.eval()
+                    output_teacher = self.model(data)
+                ce_loss = self.criterion(output, target).mean()
+                kl_loss = (self.config['temperature'] ** 2) * F.kl_div(
+                    output.div(self.config['temperature']).log_softmax(-1),
+                    output_teacher.div_(self.config['temperature']).softmax(-1),
+                    reduction='batchmean'
+                    )
+                loss = (ce_loss + kl_loss)*0.5
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                train_stats["loss"].append(loss.detach())
+                train_stats["t1acc"].append(calculate_accuracy(output, target))
+                train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
+            lr_scheduler.step()
+            train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
+            train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
+            train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
+
+            val_stats = self._evaluate(val_dataloader)
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
+            self.wandb_run.log(
+                {
+                    "learning_rate": lr_scheduler.get_last_lr()[0],
+                    **{'train_'+k: v for k, v in train_stats.items()},
+                    **{'val_'+k: v for k, v in val_stats.items()},
+                }
+            )
+            if self.config["save_model"] and (epoch+1)%10 == 0:
+                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
+                torch.save(self.model.state_dict(), filepath)
+                artifact.add_file(filepath)
+        self.wandb_run.log_artifact(artifact)
+
+    def distill_online_ablation2(self, train_dataset, val_dataset):
+        '''
+        on-line distillation ablation
+        augmentation policies swapped
+        '''
+        train_dataset.transform = transforms.Compose([
+            transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1)),
+        ]) # output is a (3, 32, 32) uint8 tensor
+        transform_student = transforms.Compose([
+            transforms.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+            transforms.Lambda(lambda x: x/255.0),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ])
+        transform_teacher = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.Lambda(lambda x: x/255.0),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ])
+
+        train_dataloader = self.get_dataloader(train_dataset, train=True)
+        val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        optimizer = self.get_optimizer(self.model)
+        lr_scheduler = self.get_lr_scheduler(optimizer)
+        # artifact = wandb.Artifact(f'checkpoints_{self.wandb_run.id}',
+        artifact = wandb.Artifact(f'checkpoints',
+                                  type='model',
+                                  metadata=self.wandb_run.config['model'])
+
+        for epoch in tqdm.trange(self.config["max_epoch"]):
+            train_stats = {
+                "loss": [],
+                "t1acc": [],
+                "t5acc": [],
+            }
+            self.model.train()
+            for batch in train_dataloader:
+                data, target = batch["image"].cuda(), batch["target"].cuda()
+                output = self.model(transform_student(data))
+                with torch.no_grad():
+                    output_teacher = self.model(transform_teacher(data))
+                ce_loss = self.criterion(output, target).mean()
+                kl_loss = (self.config['temperature'] ** 2) * F.kl_div(
+                    output.div(self.config['temperature']).log_softmax(-1),
+                    output_teacher.div_(self.config['temperature']).softmax(-1),
+                    reduction='batchmean'
+                    )
+                loss = (ce_loss + kl_loss)*0.5
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                train_stats["loss"].append(loss.detach())
+                train_stats["t1acc"].append(calculate_accuracy(output, target))
+                train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
+            lr_scheduler.step()
+            train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
+            train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
+            train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
+
+            val_stats = self._evaluate(val_dataloader)
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
+            self.wandb_run.log(
+                {
+                    "learning_rate": lr_scheduler.get_last_lr()[0],
+                    **{'train_'+k: v for k, v in train_stats.items()},
+                    **{'val_'+k: v for k, v in val_stats.items()},
+                }
+            )
+            if self.config["save_model"] and (epoch+1)%10 == 0:
+                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
+                torch.save(self.model.state_dict(), filepath)
+                artifact.add_file(filepath)
+        self.wandb_run.log_artifact(artifact)
+
+    def distill_online_ablation3(self, train_dataset, val_dataset):
+        '''
+        on-line distillation ablation
+        augmentation policies identical
+        '''
+        train_dataset.transform = transforms.Compose([
+            transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1)),
+        ]) # output is a (3, 32, 32) uint8 tensor
+        # transform = transforms.Compose([
+        #     transforms.RandomCrop(32, padding=4),
+        #     transforms.RandomHorizontalFlip(),
+        #     transforms.Lambda(lambda x: x/255.0),
+        #     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        # ])
+        transform = transforms.Compose([
+            transforms.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+            transforms.Lambda(lambda x: x/255.0),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ])
+
+        train_dataloader = self.get_dataloader(train_dataset, train=True)
+        val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        optimizer = self.get_optimizer(self.model)
+        lr_scheduler = self.get_lr_scheduler(optimizer)
+        # artifact = wandb.Artifact(f'checkpoints_{self.wandb_run.id}',
+        artifact = wandb.Artifact(f'checkpoints',
+                                  type='model',
+                                  metadata=self.wandb_run.config['model'])
+
+        for epoch in tqdm.trange(self.config["max_epoch"]):
+            train_stats = {
+                "loss": [],
+                "t1acc": [],
+                "t5acc": [],
+            }
+            self.model.train()
+            for batch in train_dataloader:
+                data, target = batch["image"].cuda(), batch["target"].cuda()
+                output = self.model(transform(data))
+                with torch.no_grad():
+                    output_strongaug = self.model(transform(data))
+                ce_loss = self.criterion(output, target).mean()
+                kl_loss = (self.config['temperature'] ** 2) * F.kl_div(
+                    output.div(self.config['temperature']).log_softmax(-1),
+                    output_strongaug.div_(self.config['temperature']).softmax(-1),
+                    reduction='batchmean'
+                    )
+                loss = (ce_loss + kl_loss)*0.5
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                train_stats["loss"].append(loss.detach())
+                train_stats["t1acc"].append(calculate_accuracy(output, target))
+                train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
+            lr_scheduler.step()
+            train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
+            train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
+            train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
+
+            val_stats = self._evaluate(val_dataloader)
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
+            self.wandb_run.log(
+                {
+                    "learning_rate": lr_scheduler.get_last_lr()[0],
+                    **{'train_'+k: v for k, v in train_stats.items()},
+                    **{'val_'+k: v for k, v in val_stats.items()},
+                }
+            )
+            if self.config["save_model"] and (epoch+1)%10 == 0:
+                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
+                torch.save(self.model.state_dict(), filepath)
+                artifact.add_file(filepath)
+        self.wandb_run.log_artifact(artifact)
 
 
 @torch.no_grad()
