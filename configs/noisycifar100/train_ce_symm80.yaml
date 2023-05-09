@@ -3,6 +3,7 @@ data:
   noise_rate: 0.8
   noise_type: symmetric
   random_seed: 42
+  download: true
 
 model:
   architecture: resnet18

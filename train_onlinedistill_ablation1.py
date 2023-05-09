@@ -19,6 +19,9 @@ torch.manual_seed(42)
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = True
 
+# torch.backends.cuda.matmul.allow_tf32 = True
+# torch.backends.cudnn.allow_tf32 = True
+
 
 parser = argparse.ArgumentParser(description='Training Config', add_help=False)
 parser.add_argument('--config', type=str, required=True, help="./configs/train_base.yaml")
@@ -48,7 +51,7 @@ def main():
                     wandb_run=wandb_run,
                     )
 
-    trainer.fit(train_dataset, test_dataset)
+    trainer.distill_online_ablation1(train_dataset, test_dataset)
 
 
     # wandb_run.alert(

@@ -48,7 +48,16 @@ def main():
                     wandb_run=wandb_run,
                     )
 
-    trainer.fit(train_dataset, test_dataset)
+    import copy
+    teacher_model = copy.deepcopy(model)
+
+    WANDB_RUN_ID = "mquy2drg" # NoisyCIFAR10(symm,0.4)-CE
+    # WANDB_RUN_ID = "ccnf390c" # NoisyCIFAR10(symm,0.4)-MAE
+    checkpoint = wandb.restore("model_199.pth", run_path=f"siit-iitp/noisy-label/{WANDB_RUN_ID}", replace=True)
+    teacher_model.load_state_dict(torch.load(checkpoint.name, map_location="cuda"))
+    teacher_model.eval()
+
+    trainer.distill(train_dataset, test_dataset, teacher_model)
 
 
     # wandb_run.alert(
