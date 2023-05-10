@@ -311,6 +311,79 @@ class Trainer:
                 torch.save(self.model.state_dict(), filepath)
                 self.wandb_run.save(filepath)
 
+    def distill_perturb(self, train_dataset: Dataset, val_dataset: Dataset, teacher_model: nn.Module, N_aug: int = 100):
+
+        train_dataset.transform = transforms.Compose([
+            transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1)),
+        ]) # output is a (3, 32, 32) uint8 tensor
+        # TODO: change x.repeat(N, 1, 1, 1) => torch.stack([x for _ in range(N)], dim=0).reshape((-1, *x.shape[1:]))
+        transform_teacher = transforms.Compose([
+            transforms.Lambda(lambda x: x.repeat(N_aug, 1, 1, 1)), # It makes data[i*batch:(i+1)batch] == data[(i+1)*batch:(i+2)*batch]
+            transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+            transforms.Lambda(lambda x: x/255.0),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010), inplace=True),
+        ])
+        transform_student = transforms.Compose([
+            transforms_v2.RandomCrop(32, padding=4),
+            transforms_v2.RandomHorizontalFlip(),
+            transforms.Lambda(lambda x: x/255.0),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010), inplace=True),
+        ])
+
+        train_dataloader = self.get_dataloader(train_dataset, train=True)
+        val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        optimizer = self.get_optimizer(self.model)
+        lr_scheduler = self.get_lr_scheduler(optimizer)
+
+        teacher_model = torch.jit.script(teacher_model)
+        # teacher_model = torch.compile(teacher_model)
+        for epoch in tqdm.trange(self.config["max_epoch"]):
+            train_stats = {
+                "loss": [],
+                "t1acc": [],
+                "t5acc": [],
+            }
+            self.model.train()
+            teacher_model.eval() # 이거 train 으로 두면 성능 더 오를듯?
+            for batch in train_dataloader:
+                data, target = batch["image"].cuda(), batch["target"].cuda()
+                with torch.no_grad():
+                    output_teacher = teacher_model(transform_teacher(data)) # data shape: (N, 3, 32, 32)
+                    output_teacher = output_teacher.reshape((N_aug, -1, output_teacher.shape[-1])).mean(dim=0) # dim[1] == batch_size
+                output = self.model(transform_student(data))
+                loss = (self.config['temperature'] ** 2) * F.kl_div(
+                    output.div(self.config['temperature']).log_softmax(-1),
+                    output_teacher.div_(self.config['temperature']).softmax(-1),
+                    reduction='batchmean'
+                    )
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                train_stats["loss"].append(loss.detach())
+                train_stats["t1acc"].append(calculate_accuracy(output, target))
+                train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
+            lr_scheduler.step()
+            train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
+            train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
+            train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
+
+            val_stats = self._evaluate(val_dataloader)
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
+            self.wandb_run.log(
+                {
+                    "learning_rate": lr_scheduler.get_last_lr()[0],
+                    **{'train_'+k: v for k, v in train_stats.items()},
+                    **{'val_'+k: v for k, v in val_stats.items()},
+                }
+            )
+            if self.config["save_model"] and (epoch+1)%10 == 0:
+                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
+                torch.save(self.model.state_dict(), filepath)
+                self.wandb_run.save(filepath)
+
+
     @torch.no_grad()
     def _evaluate(self, dataloader: torch.utils.data.DataLoader) -> dict:
         self.model.eval()
