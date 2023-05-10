@@ -19,6 +19,9 @@ torch.manual_seed(42)
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = True
 
+torch.backends.cuda.matmul.allow_tf32 = False
+torch.backends.cudnn.allow_tf32 = False
+
 
 parser = argparse.ArgumentParser(description='Training Config', add_help=False)
 parser.add_argument('--config', type=str, required=True, help="./configs/train_base.yaml")

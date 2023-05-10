@@ -9,8 +9,13 @@ import wandb
 from wandb.sdk.wandb_run import Run
 import pdb
 from models import MeanAbsoluteError
+import torchvision
+torchvision.disable_beta_transforms_warning()
 from torchvision import transforms
+import torchvision.transforms.v2 as transforms_v2
 import numpy as np
+
+
 
 class Trainer:
     def __init__(self, model: nn.Module, config: dict, wandb_run: Run =None):
@@ -82,19 +87,22 @@ class Trainer:
             transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1)),
         ]) # output is a (3, 32, 32) uint8 tensor
         transform_train = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
+            transforms_v2.RandomCrop(32, padding=4),
+            transforms_v2.RandomHorizontalFlip(),
             transforms.Lambda(lambda x: x/255.0),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010), inplace=True),
         ])
         transform_teacher = transforms.Compose([
-            transforms.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+            transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
             transforms.Lambda(lambda x: x/255.0),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010), inplace=True),
         ])
 
         train_dataloader = self.get_dataloader(train_dataset, train=True)
         val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        # self.model = torch.compile(self.model)
+        self.model = torch.jit.script(self.model)
 
         optimizer = self.get_optimizer(self.model)
         lr_scheduler = self.get_lr_scheduler(optimizer)
@@ -157,15 +165,15 @@ class Trainer:
             transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1)),
         ]) # output is a (3, 32, 32) uint8 tensor
         transform_teacher = transforms.Compose([
-            transforms.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+            transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
             transforms.Lambda(lambda x: x/255.0),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010), inplace=True),
         ])
         transform_student = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
+            transforms_v2.RandomCrop(32, padding=4),
+            transforms_v2.RandomHorizontalFlip(),
             transforms.Lambda(lambda x: x/255.0),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010), inplace=True),
         ])
 
         train_dataloader = self.get_dataloader(train_dataset, train=True)
@@ -175,6 +183,7 @@ class Trainer:
         lr_scheduler = self.get_lr_scheduler(optimizer)
 
         teacher_model = torch.jit.script(teacher_model)
+        # teacher_model = torch.compile(teacher_model)
 
         for epoch in tqdm.trange(self.config["max_epoch"]):
             train_stats = {
@@ -278,10 +287,10 @@ class Trainer:
             transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1)),
         ]) # output is a (3, 32, 32) uint8 tensor
         transform_train = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
+            transforms_v2.RandomCrop(32, padding=4),
+            transforms_v2.RandomHorizontalFlip(),
             transforms.Lambda(lambda x: x/255.0),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010), inplace=True),
         ])
 
         train_dataloader = self.get_dataloader(train_dataset, train=True)
@@ -352,15 +361,15 @@ class Trainer:
             transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1)),
         ]) # output is a (3, 32, 32) uint8 tensor
         transform_student = transforms.Compose([
-            transforms.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+            transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
             transforms.Lambda(lambda x: x/255.0),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010), inplace=True),
         ])
         transform_teacher = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
+            transforms_v2.RandomCrop(32, padding=4),
+            transforms_v2.RandomHorizontalFlip(),
             transforms.Lambda(lambda x: x/255.0),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010), inplace=True),
         ])
 
         train_dataloader = self.get_dataloader(train_dataset, train=True)
@@ -428,15 +437,15 @@ class Trainer:
             transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1)),
         ]) # output is a (3, 32, 32) uint8 tensor
         # transform = transforms.Compose([
-        #     transforms.RandomCrop(32, padding=4),
-        #     transforms.RandomHorizontalFlip(),
+        #     transforms_v2.RandomCrop(32, padding=4),
+        #     transforms_v2.RandomHorizontalFlip(),
         #     transforms.Lambda(lambda x: x/255.0),
-        #     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        #     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010), inplace=True),
         # ])
         transform = transforms.Compose([
-            transforms.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+            transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
             transforms.Lambda(lambda x: x/255.0),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010), inplace=True),
         ])
 
         train_dataloader = self.get_dataloader(train_dataset, train=True)
@@ -460,11 +469,11 @@ class Trainer:
                 data, target = batch["image"].cuda(), batch["target"].cuda()
                 output = self.model(transform(data))
                 with torch.no_grad():
-                    output_strongaug = self.model(transform(data))
+                    output_teacher = self.model(transform(data))
                 ce_loss = self.criterion(output, target).mean()
                 kl_loss = (self.config['temperature'] ** 2) * F.kl_div(
                     output.div(self.config['temperature']).log_softmax(-1),
-                    output_strongaug.div_(self.config['temperature']).softmax(-1),
+                    output_teacher.div_(self.config['temperature']).softmax(-1),
                     reduction='batchmean'
                     )
                 loss = (ce_loss + kl_loss)*0.5
@@ -497,10 +506,10 @@ class Trainer:
 
 
 @torch.no_grad()
-def calculate_accuracy(output: torch.Tensor, target: torch.Tensor, k=1):
+def calculate_accuracy(prob: torch.Tensor, target: torch.Tensor, k=1):
     """Computes top-k accuracy"""
-    k = min(k, output.size(-1)) # in case num_classes is smaller than k.
-    pred = torch.topk(output, k, 1, True, True).indices
-    correct = pred.eq(target[..., None].expand_as(pred)).any(dim=1)
+    k = min(k, prob.size(-1)) # in case num_classes is smaller than k.
+    pred = torch.topk(prob, k, -1).indices
+    correct = pred.eq(target[..., None].expand_as(pred)).any(dim=-1)
     accuracy = correct.float().mean().mul(100.0)
     return accuracy
