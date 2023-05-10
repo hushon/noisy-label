@@ -37,6 +37,60 @@ class MeanAbsoluteError(torch.nn.Module):
             raise NotImplementedError
 
 
+class KLDivDistillationLoss(nn.KLDivLoss):
+    """
+    Modified nn.KLDivLoss which
+    takes in logits instead of log-likelihoods
+    """
+    def __init__(self, temperature=1.0, reduction="none"):
+        super().__init__(reduction=reduction)
+        self.temperature = temperature
+
+    def forward(self, pred_logits, target_logits):
+        x = pred_logits.div(self.temperature).log_softmax(-1)
+        y = target_logits.div(self.temperature).softmax(-1)
+        if self.reduction == 'none':
+            return super().forward(x, y).sum(-1)
+        else:
+            return super().forward(x, y)
+
+
+class L1DistillationLoss(nn.L1Loss):
+    """
+    Modified nn.L1Loss which
+    takes in logits instead of probabilities
+    """
+    def __init__(self, temperature=1.0, reduction="none"):
+        super().__init__(reduction=reduction)
+        self.temperature = temperature
+
+    def forward(self, pred_logits, target_logits):
+        x = pred_logits.div(self.temperature).softmax(-1)
+        y = target_logits.div(self.temperature).softmax(-1)
+        if self.reduction == 'none':
+            return super().forward(x, y).mean(-1)
+        else:
+            return super().forward(x, y)
+
+
+class SmoothL1DistillationLoss(nn.SmoothL1Loss):
+    """
+    Modified nn.SmoothL1Loss which
+    takes in logits instead of probabilities
+    """
+    def __init__(self, temperature=1.0, reduction="none"):
+        super().__init__(reduction=reduction)
+        self.temperature = temperature
+
+    def forward(self, pred_logits, target_logits):
+        x = pred_logits.div(self.temperature).softmax(-1)
+        y = target_logits.div(self.temperature).softmax(-1)
+        if self.reduction == 'none':
+            return super().forward(x, y).mean(-1)
+        else:
+            return super().forward(x, y)
+
+
 class MCDropout(nn.Dropout):
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         return F.dropout(input, self.p, True, self.inplace)
