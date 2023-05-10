@@ -9,12 +9,12 @@ import wandb
 from wandb.sdk.wandb_run import Run
 import pdb
 from models import MeanAbsoluteError
+from models import KLDivDistillationLoss, L1DistillationLoss, SmoothL1DistillationLoss
 import torchvision
 torchvision.disable_beta_transforms_warning()
 from torchvision import transforms
 import torchvision.transforms.v2 as transforms_v2
 import numpy as np
-
 
 
 class Trainer:
@@ -27,48 +27,92 @@ class Trainer:
     def get_optimizer(self,
                       model: nn.Module
                       ) -> torch.optim.Optimizer:
-        if self.config["optimizer"] == "sgd":
-            return torch.optim.SGD(
-                model.parameters(),
-                lr=self.config["init_lr"],
-                momentum=self.config["momentum"],
-                weight_decay=self.config["weight_decay"],
-            )
-        elif self.config["optimizer"] == "adam":
-            return torch.optim.Adam(
-                model.parameters(),
-                lr=self.config["init_lr"],
-                weight_decay=self.config["weight_decay"],
-            )
-        else:
-            raise NotImplementedError
+        match self.config["optimizer"]:
+            case "sgd":
+                optimizer = torch.optim.SGD(
+                    model.parameters(),
+                    lr=self.config["init_lr"],
+                    momentum=self.config["momentum"],
+                    weight_decay=self.config["weight_decay"],
+                )
+            case "adam":
+                optimizer = torch.optim.Adam(
+                    model.parameters(),
+                    lr=self.config["init_lr"],
+                    weight_decay=self.config["weight_decay"],
+                )
+            case _:
+                raise NotImplementedError(self.config["optimizer"])
+        return optimizer
 
     def get_lr_scheduler(self,
                          optimizer: torch.optim.Optimizer
                          ) -> torch.optim.lr_scheduler.LRScheduler:
-        if self.config["lr_scheduler"] == "cosine":
-            return torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer,
-                T_max=self.config["max_epoch"],
-                eta_min=0.0,
-            )
-        elif self.config["lr_scheduler"] == "multistep":
-            n = self.config["max_epoch"] // 10
-            return torch.optim.lr_scheduler.MultiStepLR(
-                optimizer,
-                milestones=[3*n, 6*n, 8*n],
-                gamma=0.2,
-            )
-        else:
-            raise NotImplementedError
+        match self.config["lr_scheduler"]:
+            case "cosine":
+                lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                    optimizer,
+                    T_max=self.config["max_epoch"],
+                    eta_min=0.0,
+                )
+            case "multistep":
+                n = self.config["max_epoch"] // 10
+                lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                    optimizer,
+                    milestones=[3*n, 6*n, 8*n],
+                    gamma=0.2,
+                )
+            case _:
+                raise NotImplementedError(self.config["lr_scheduler"])
+        return lr_scheduler
 
-    def get_loss_fn(self) -> torch.nn.Module:
-        if self.config["loss_fn"] == "cross_entropy":
-            return nn.CrossEntropyLoss(reduction="none")
-        if self.config["loss_fn"] == "mae":
-            return MeanAbsoluteError(reduction="none")
-        else:
-            raise NotImplementedError
+    def get_loss_fn(self) -> nn.Module:
+        match self.config["loss_fn"]:
+            case "cross_entropy":
+                fn = nn.CrossEntropyLoss(reduction="none")
+            case "mae":
+                fn = MeanAbsoluteError(reduction="none")
+            case _:
+                raise NotImplementedError(self.config["loss_fn"])
+        return fn
+
+    def get_distill_loss_fn(self) -> nn.Module:
+        match self.config["distill_loss_fn"]:
+            case "kl_div":
+                fn = KLDivDistillationLoss(self.config['temperature'], reduction="none")
+            case "l1_dist":
+                fn = L1DistillationLoss(self.config['temperature'], reduction="none")
+            case "smoothed_l1_dist":
+                fn = SmoothL1DistillationLoss(self.config['temperature'], reduction="none")
+            case _:
+                raise NotImplementedError(self.config["distill_loss_fn"])
+        return fn
+
+    @staticmethod
+    def get_transform(op_name):
+        CIFAR10_MEAN_STD = ((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+        CIFAR100_MEAN_STD = ((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
+        match op_name:
+            case "totensor":
+                transform = transforms.Compose([
+                    transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1).contiguous()),
+                ]) # output is a (3, 32, 32) uint8 tensor
+            case "randomcrop":
+                transform = transforms.Compose([
+                    transforms_v2.RandomCrop(32, padding=4),
+                    transforms_v2.RandomHorizontalFlip(),
+                    transforms.Lambda(lambda x: x/255.0),
+                    transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+                ])
+            case "autoaugment":
+                transform = transforms.Compose([
+                    transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+                    transforms.Lambda(lambda x: x/255.0),
+                    transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+                ])
+            case _:
+                raise NotImplementedError(op_name)
+        return transform
 
     def get_dataloader(self,
                        dataset: torch.utils.data.Dataset,
@@ -82,21 +126,10 @@ class Trainer:
             drop_last=train,
         )
 
-    def fit(self, train_dataset, val_dataset):
-        train_dataset.transform = transforms.Compose([
-            transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1)),
-        ]) # output is a (3, 32, 32) uint8 tensor
-        transform_train = transforms.Compose([
-            transforms_v2.RandomCrop(32, padding=4),
-            transforms_v2.RandomHorizontalFlip(),
-            transforms.Lambda(lambda x: x/255.0),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010), inplace=True),
-        ])
-        transform_teacher = transforms.Compose([
-            transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
-            transforms.Lambda(lambda x: x/255.0),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010), inplace=True),
-        ])
+    def fit(self, train_dataset: Dataset, val_dataset: Dataset):
+        train_dataset.transform = self.get_transform('totensor')
+        transform_train = self.get_transform('randomcrop')
+        # transform_train = self.get_transform('autoaugment')
 
         train_dataloader = self.get_dataloader(train_dataset, train=True)
         val_dataloader = self.get_dataloader(val_dataset, train=False)
@@ -121,19 +154,68 @@ class Trainer:
             for batch in train_dataloader:
                 data, target = batch["image"].cuda(), batch["target"].cuda()
                 output = self.model(transform_train(data))
-                if not self.config['online_distill']:
-                    loss = self.criterion(output, target).mean()
-                else:
-                    with torch.no_grad():
-                        output_teacher = self.model(transform_teacher(data))
-                    ce_loss = self.criterion(output, target).mean()
-                    kl_loss = (self.config['temperature'] ** 2) * F.kl_div(
-                        output.div(self.config['temperature']).log_softmax(-1),
-                        output_teacher.div_(self.config['temperature']).softmax(-1),
-                        reduction='batchmean'
-                        )
-                    loss = (ce_loss + kl_loss)*0.5
+                loss = self.criterion(output, target).mean()
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                train_stats["loss"].append(loss.detach())
+                train_stats["t1acc"].append(calculate_accuracy(output, target))
+                train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
+            lr_scheduler.step()
+            train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
+            train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
+            train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
 
+            val_stats = self._evaluate(val_dataloader)
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
+            self.wandb_run.log(
+                {
+                    "learning_rate": lr_scheduler.get_last_lr()[0],
+                    **{'train_'+k: v for k, v in train_stats.items()},
+                    **{'val_'+k: v for k, v in val_stats.items()},
+                }
+            )
+            if self.config["save_model"] and (epoch+1)%10 == 0:
+                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
+                torch.save(self.model.state_dict(), filepath)
+                artifact.add_file(filepath)
+        self.wandb_run.log_artifact(artifact)
+
+    def fit_nrosd(self, train_dataset: Dataset, val_dataset: Dataset):
+        train_dataset.transform = self.get_transform('totensor')
+        transform_train = self.get_transform('randomcrop')
+        transform_teacher = self.get_transform('autoaugment')
+
+        train_dataloader = self.get_dataloader(train_dataset, train=True)
+        val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        # self.model = torch.compile(self.model)
+        self.model = torch.jit.script(self.model)
+
+        optimizer = self.get_optimizer(self.model)
+        lr_scheduler = self.get_lr_scheduler(optimizer)
+        # artifact = wandb.Artifact(f'checkpoints_{self.wandb_run.id}',
+        artifact = wandb.Artifact(f'checkpoints',
+                                  type='model',
+                                  metadata=self.wandb_run.config['model'])
+
+        distill_criterion = self.get_distill_loss_fn()
+
+        for epoch in tqdm.trange(self.config["max_epoch"]):
+            train_stats = {
+                "loss": [],
+                "t1acc": [],
+                "t5acc": [],
+            }
+            self.model.train()
+            for batch in train_dataloader:
+                data, target = batch["image"].cuda(), batch["target"].cuda()
+                output = self.model(transform_train(data))
+                with torch.no_grad():
+                    output_teacher = self.model(transform_teacher(data))
+                target_loss = self.criterion(output, target).mean()
+                distill_loss = distill_criterion(output, output_teacher).mean()
+                loss = self.config['alpha']*target_loss + (1.0-self.config['alpha'])*distill_loss
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
