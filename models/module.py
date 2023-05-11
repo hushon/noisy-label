@@ -13,14 +13,15 @@ class MeanAbsoluteError(torch.nn.Module):
         pred: unnormalized logits
         labels: target labels
     '''
-    def __init__(self, reduction="mean"):
+    def __init__(self, scale=1.0, reduction="mean"):
         super().__init__()
+        self.scale = scale
         self.reduction = reduction
 
     def forward(self, pred, labels):
         pred = F.softmax(pred, dim=-1)
-        mae = 2 - 2*torch.gather(pred, -1, labels.view(-1, 1))
-        mae = mae.squeeze(-1)
+        loss = 2 - 2*torch.gather(pred, -1, labels.view(-1, 1))
+        loss = loss.squeeze(-1)
         # Note: Reduced MAE
         # Original: torch.abs(pred - label_one_hot).sum(dim=1)
         # $MAE = \sum_{k=1}^{K} |\bm{p}(k|\bm{x}) - \bm{q}(k|\bm{x})|$
@@ -28,13 +29,77 @@ class MeanAbsoluteError(torch.nn.Module):
         # $MAE = 2 - 2p(y|\bm{x})$
         #
         if self.reduction == "mean":
-            return mae.mean()
+            loss = loss.mean()
         elif self.reduction == "sum":
-            return mae.sum()
+            loss = loss.sum()
         elif self.reduction == "none":
-            return mae
+            loss = loss
         else:
             raise NotImplementedError
+        return loss * self.scale
+
+
+class ReverseCrossEntropy(nn.Module):
+    def __init__(self, num_classes, scale=1.0):
+        super().__init__()
+        self.num_classes = num_classes
+        self.scale = scale
+
+    def forward(self, pred, labels):
+        pred = F.softmax(pred, dim=1)
+        pred = torch.clamp(pred, min=1e-7, max=1.0)
+        label_one_hot = F.one_hot(labels, self.num_classes).float()
+        label_one_hot = torch.clamp(label_one_hot, min=1e-4, max=1.0)
+        rce = (-1*torch.sum(pred * torch.log(label_one_hot), dim=1))
+        return self.scale * rce.mean()
+
+
+class SymmetricCrossEntropyLoss(nn.Module):
+    '''
+    Wang, Yisen, et al. "Symmetric cross entropy for robust learning with noisy labels."
+    Proceedings of the IEEE/CVF International Conference on Computer Vision. 2019.
+    '''
+    def __init__(self, alpha, beta, num_classes=10):
+        super().__init__()
+        self.alpha = alpha
+        self.beta = beta
+        self.num_classes = num_classes
+        self.cross_entropy = nn.CrossEntropyLoss()
+
+
+    def forward(self, pred, labels):
+        # CCE
+        ce = self.cross_entropy(pred, labels)
+
+        # RCE
+        pred = F.softmax(pred, dim=1)
+        pred = torch.clamp(pred, min=1e-7, max=1.0)
+        label_one_hot = F.one_hot(labels, self.num_classes).float()
+        label_one_hot = torch.clamp(label_one_hot, min=1e-4, max=1.0)
+        rce = (-1*torch.sum(pred * torch.log(label_one_hot), dim=1))
+
+        # Loss
+        loss = self.alpha * ce + self.beta * rce.mean()
+        return loss
+
+
+class GeneralizedCrossEntropy(nn.Module):
+    '''
+    Zhang, Zhilu, and Mert Sabuncu. "Generalized cross entropy loss for
+    training deep neural networks with noisy labels."
+    Advances in neural information processing systems 31 (2018).
+    '''
+    def __init__(self, num_classes, q=0.7):
+        super().__init__()
+        self.num_classes = num_classes
+        self.q = q
+
+    def forward(self, pred, labels):
+        pred = F.softmax(pred, dim=1)
+        pred = torch.clamp(pred, min=1e-7, max=1.0)
+        label_one_hot = F.one_hot(labels, self.num_classes).float()
+        gce = (1. - torch.pow(torch.sum(label_one_hot * pred, dim=1), self.q)) / self.q
+        return gce.mean()
 
 
 class KLDivDistillationLoss(nn.KLDivLoss):
