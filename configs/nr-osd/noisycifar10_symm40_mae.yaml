@@ -13,12 +13,12 @@ wandb:
   mode: online # "disabled" or "online"
   entity: siit-iitp
   project: noisy-label
-  name: NoisyCIFAR10(symm,0.4)-CE-NROSD
+  name: NoisyCIFAR10(symm,0.4)-MAE-NROSD
   save_code: true
 
 trainer:
   optimizer: sgd
-  init_lr: 1.0e-1
+  init_lr: 0.01
   momentum: 0.9
   weight_decay: 1.0e-4
   lr_scheduler: multistep
@@ -30,5 +30,5 @@ trainer:
   alpha: 0.5
   teacher_aug: autoaugment
   student_aug: randomcrop
-  distill_loss_fn: l1_dist
+  distill_loss_fn: smoothed_l1_dist
   temperature: 1.0

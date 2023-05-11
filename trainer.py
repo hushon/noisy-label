@@ -22,7 +22,7 @@ class Trainer:
         self.model = model.cuda()
         self.config = config
         self.wandb_run = wandb_run
-        self.criterion = self.get_loss_fn().cuda()
+        self.criterion = self.get_loss_fn(self.config["loss_fn"]).cuda()
 
     def get_optimizer(self,
                       model: nn.Module
@@ -66,26 +66,28 @@ class Trainer:
                 raise NotImplementedError(self.config["lr_scheduler"])
         return lr_scheduler
 
-    def get_loss_fn(self) -> nn.Module:
-        match self.config["loss_fn"]:
+    @staticmethod
+    def get_loss_fn(fn_name) -> nn.Module:
+        match fn_name:
             case "cross_entropy":
                 fn = nn.CrossEntropyLoss(reduction="none")
             case "mae":
                 fn = MeanAbsoluteError(reduction="none")
             case _:
-                raise NotImplementedError(self.config["loss_fn"])
+                raise NotImplementedError(fn_name)
         return fn
 
-    def get_distill_loss_fn(self) -> nn.Module:
-        match self.config["distill_loss_fn"]:
+    @staticmethod
+    def get_distill_loss_fn(fn_name, temperature=1.0) -> nn.Module:
+        match fn_name:
             case "kl_div":
-                fn = KLDivDistillationLoss(self.config['temperature'], reduction="none")
+                fn = KLDivDistillationLoss(temperature, reduction="none")
             case "l1_dist":
-                fn = L1DistillationLoss(self.config['temperature'], reduction="none")
+                fn = L1DistillationLoss(temperature, reduction="none")
             case "smoothed_l1_dist":
-                fn = SmoothL1DistillationLoss(self.config['temperature'], reduction="none")
+                fn = SmoothL1DistillationLoss(temperature, reduction="none")
             case _:
-                raise NotImplementedError(self.config["distill_loss_fn"])
+                raise NotImplementedError(fn_name)
         return fn
 
     @staticmethod
@@ -199,13 +201,19 @@ class Trainer:
                                   type='model',
                                   metadata=self.wandb_run.config['model'])
 
-        distill_criterion = self.get_distill_loss_fn()
+        distill_criterion = self.get_distill_loss_fn(
+                                            self.config["distill_loss_fn"],
+                                            self.config['temperature']
+                                            )
+        alpha = self.config['alpha']
 
-        for epoch in tqdm.trange(self.config["max_epoch"]):
+        for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True):
             train_stats = {
                 "loss": [],
                 "t1acc": [],
                 "t5acc": [],
+                "target_loss": [],
+                "distill_loss": [],
             }
             self.model.train()
             for batch in train_dataloader:
@@ -215,17 +223,21 @@ class Trainer:
                     output_teacher = self.model(transform_teacher(data))
                 target_loss = self.criterion(output, target).mean()
                 distill_loss = distill_criterion(output, output_teacher).mean()
-                loss = self.config['alpha']*target_loss + (1.0-self.config['alpha'])*distill_loss
+                loss = target_loss * alpha + distill_loss * (1.0-alpha)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
                 train_stats["loss"].append(loss.detach())
                 train_stats["t1acc"].append(calculate_accuracy(output, target))
                 train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
+                train_stats["target_loss"].append(target_loss.detach())
+                train_stats["distill_loss"].append(distill_loss.detach())
             lr_scheduler.step()
             train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
             train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
             train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
+            train_stats["target_loss"] = torch.stack(train_stats["target_loss"]).mean().item()
+            train_stats["distill_loss"] = torch.stack(train_stats["distill_loss"]).mean().item()
 
             val_stats = self._evaluate(val_dataloader)
             tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
@@ -319,16 +331,18 @@ class Trainer:
             "t1acc": [],
             "t5acc": [],
         }
+        total_size = 0
         for batch in dataloader:
             data, target = batch["image"].cuda(), batch["target"].cuda()
+            total_size += data.size(0)
             output = self.model(data)
             loss = self.criterion(output, target).mean()
-            stats["loss"].append(loss.detach())
-            stats["t1acc"].append(calculate_accuracy(output, target))
-            stats["t5acc"].append(calculate_accuracy(output, target, k=5))
-        stats["loss"] = torch.stack(stats["loss"]).mean().item()
-        stats["t1acc"] = torch.stack(stats["t1acc"]).mean().item()
-        stats["t5acc"] = torch.stack(stats["t5acc"]).mean().item()
+            stats["loss"].append(loss.detach()*data.size(0))
+            stats["t1acc"].append(calculate_accuracy(output, target)*data.size(0))
+            stats["t5acc"].append(calculate_accuracy(output, target, k=5)*data.size(0))
+        stats["loss"] = torch.tensor(stats["loss"]).sum().div(total_size).item()
+        stats["t1acc"] = torch.tensor(stats["t1acc"]).sum().div(total_size).item()
+        stats["t5acc"] = torch.tensor(stats["t5acc"]).sum().div(total_size).item()
         return stats
 
     @torch.no_grad()

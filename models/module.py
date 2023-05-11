@@ -69,7 +69,7 @@ class L1DistillationLoss(nn.L1Loss):
         x = pred_logits.div(self.temperature).softmax(-1)
         y = target_logits.div(self.temperature).softmax(-1)
         if self.reduction == 'none':
-            loss = super().forward(x, y).mean(-1)
+            loss = super().forward(x, y).sum(-1)
         else:
             loss = super().forward(x, y)
         return loss * (self.temperature**2)
@@ -88,7 +88,7 @@ class SmoothL1DistillationLoss(nn.SmoothL1Loss):
         x = pred_logits.div(self.temperature).softmax(-1)
         y = target_logits.div(self.temperature).softmax(-1)
         if self.reduction == 'none':
-            loss = super().forward(x, y).mean(-1)
+            loss = super().forward(x, y).sum(-1)
         else:
             loss = super().forward(x, y)
         return loss * (self.temperature**2)
