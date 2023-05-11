@@ -185,8 +185,8 @@ class Trainer:
 
     def fit_nrosd(self, train_dataset: Dataset, val_dataset: Dataset):
         train_dataset.transform = self.get_transform('totensor')
-        transform_train = self.get_transform('randomcrop')
-        transform_teacher = self.get_transform('autoaugment')
+        transform_train = self.get_transform(self.config['student_aug'])
+        transform_teacher = self.get_transform(self.config['teacher_aug'])
 
         train_dataloader = self.get_dataloader(train_dataset, train=True)
         val_dataloader = self.get_dataloader(val_dataset, train=False)
