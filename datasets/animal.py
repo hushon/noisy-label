@@ -52,7 +52,7 @@ class Animal10N(torch.utils.data.Dataset):
             postprocess=gdown.extractall,
             fuzzy=True
             )
-        gdown.extractall(os.path.join(root, 'animal-10n', 'raw_image.zip'))
+        gdown.extractall(os.path.join(self.root, 'animal-10n', 'raw_image.zip'))
 
     def __len__(self):
         return len(self.targets)
@@ -75,9 +75,3 @@ class Animal10N(torch.utils.data.Dataset):
             'image': image,
             'target': target
         } # No target_gt: real-world noisy dataset.
-
-if __name__ == '__main__':
-    import pdb
-    root = './data/Animal-10N'
-    animal_dset = Animal10(root, train=True)
-    pdb.set_trace()

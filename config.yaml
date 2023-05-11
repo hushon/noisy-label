@@ -1,6 +1,6 @@
 data:
   dataset: noisy_cifar10
-  noise_rate: 0.8
+  noise_rate: 0.4
   noise_type: symmetric
   random_seed: 42
   download: true
@@ -13,17 +13,19 @@ wandb:
   mode: online # "disabled" or "online"
   entity: siit-iitp
   project: noisy-label
-  name: NoisyCIFAR10(symm,0.8)-MAE
+  name: NoisyCIFAR10(symm,0.4)-CE-AutoAugment
   save_code: true
 
 trainer:
   optimizer: sgd
-  init_lr: 0.01
+  init_lr: 1.0e-1
   momentum: 0.9
   weight_decay: 1.0e-4
   lr_scheduler: multistep
   max_epoch: 200
-  loss_fn: mae
+  loss_fn: cross_entropy
   num_workers: 2
   batch_size: 128
   save_model: true
+  distill_loss_fn: l1_dist
+  temperature: 1.0

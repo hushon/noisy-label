@@ -18,7 +18,7 @@ wandb:
 
 trainer:
   optimizer: sgd
-  init_lr: 1.0e-1
+  init_lr: 0.01
   momentum: 0.9
   weight_decay: 1.0e-4
   lr_scheduler: multistep
