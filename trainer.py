@@ -8,7 +8,8 @@ import os
 import wandb
 from wandb.sdk.wandb_run import Run
 import pdb
-from models import MeanAbsoluteError
+from models import MeanAbsoluteError, ReverseCrossEntropyLoss, SymmetricCrossEntropyLoss, \
+    GeneralizedCrossEntropyLoss
 from models import KLDivDistillationLoss, L1DistillationLoss, SmoothL1DistillationLoss
 import torchvision
 torchvision.disable_beta_transforms_warning()
@@ -73,6 +74,12 @@ class Trainer:
                 fn = nn.CrossEntropyLoss(reduction="none")
             case "mae":
                 fn = MeanAbsoluteError(reduction="none")
+            case "reverse_cross_entropy":
+                fn = ReverseCrossEntropyLoss(reduction="none")
+            case "symmetric_cross_entropy":
+                fn = SymmetricCrossEntropyLoss(reduction="none")
+            case "generalized_cross_entropy":
+                fn = GeneralizedCrossEntropyLoss(reduction="none")
             case _:
                 raise NotImplementedError(fn_name)
         return fn

@@ -1,24 +1,24 @@
 data:
-  dataset: noisy_cifar10
-  noise_rate: 0.8
+  dataset: noisy_cifar100
+  noise_rate: 0.2
   noise_type: symmetric
   random_seed: 42
   download: true
 
 model:
   architecture: resnet18
-  num_classes: 10
+  num_classes: 100
 
 wandb:
   mode: online # "disabled" or "online"
   entity: siit-iitp
   project: noisy-label
-  name: NoisyCIFAR10(symm,0.8)-NROSD-MAE
+  name: NoisyCIFAR100(symm,0.2)-NROSD-CE
   save_code: true
 
 trainer:
   optimizer: sgd
-  init_lr: 0.01
+  init_lr: 0.1
   momentum: 0.9
   weight_decay: 1.0e-4
   lr_scheduler: multistep
@@ -26,9 +26,9 @@ trainer:
   num_workers: 2
   batch_size: 128
   save_model: true
-  loss_fn: mae
+  loss_fn: cross_entropy
   alpha: 0.5
   teacher_aug: autoaugment
   student_aug: randomcrop
-  distill_loss_fn: smoothed_l1_dist
+  distill_loss_fn: kl_div
   temperature: 1.0
