@@ -1,24 +1,24 @@
 data:
-  dataset: noisy_cifar10
-  noise_rate: 0.8
-  noise_type: symmetric
+  dataset: noisy_cifar100
+  noise_rate: 0.1
+  noise_type: asymmetric
   random_seed: 42
   download: true
 
 model:
   architecture: resnet18
-  num_classes: 10
+  num_classes: 100
 
 wandb:
   mode: online # "disabled" or "online"
   entity: siit-iitp
   project: noisy-label
-  name: NoisyCIFAR10(symm,0.8)-NROSD-MAE
+  name: NoisyCIFAR100(asymm,0.1)-NROSD-MAE
   save_code: true
 
 trainer:
   optimizer: sgd
-  init_lr: 0.01
+  init_lr: 0.1
   momentum: 0.9
   weight_decay: 1.0e-4
   lr_scheduler: multistep
