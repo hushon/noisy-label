@@ -5,3 +5,4 @@ wandb/
 *.ipynb
 *.pth
 *.pt
+temp/
