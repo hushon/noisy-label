@@ -16,6 +16,7 @@ torchvision.disable_beta_transforms_warning()
 from torchvision import transforms
 import torchvision.transforms.v2 as transforms_v2
 import numpy as np
+import datasets
 
 
 class Trainer:
@@ -100,8 +101,7 @@ class Trainer:
 
     @staticmethod
     def get_transform(op_name):
-        CIFAR10_MEAN_STD = ((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-        CIFAR100_MEAN_STD = ((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
+
         match op_name:
             case "totensor":
                 transform = transforms.Compose([
@@ -120,19 +120,20 @@ class Trainer:
             #         transforms.Lambda(lambda x: x/255.0),
             #         transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
             #     ])
-
             case "randomcrop":
                 transform = transforms.Compose([
-                    transforms.RandomResizedCrop(224),
-                    transforms.RandomHorizontalFlip(),
-                    transforms.Lambda(lambda x: x/255.0),
-                    transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+                    transforms_v2.RandomResizedCrop(224),
+                    transforms_v2.RandomHorizontalFlip(),
+                    transforms.ToTensor(),
+                    transforms.Normalize(*datasets.IMAGENET_MEAN_STD, inplace=True),
                 ])
             case "autoaugment":
                 transform = transforms.Compose([
-                    transforms.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
-                    transforms.Lambda(lambda x: x/255.0),
-                    transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+                    transforms_v2.Resize(256),
+                    transforms_v2.CenterCrop(224),
+                    transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
+                    transforms.ToTensor(),
+                    transforms.Normalize(*datasets.IMAGENET_MEAN_STD, inplace=True),
                 ])
             case _:
                 raise NotImplementedError(op_name)
@@ -206,15 +207,15 @@ class Trainer:
         self.wandb_run.log_artifact(artifact)
 
     def fit_nrosd(self, train_dataset: Dataset, val_dataset: Dataset):
-        train_dataset.transform = self.get_transform('totensor')
-        transform_train = self.get_transform(self.config['student_aug'])
-        transform_teacher = self.get_transform(self.config['teacher_aug'])
+        train_dataset.transform = self.get_transform(self.config['student_aug'])
+        train_dataset.transform2 = self.get_transform(self.config['teacher_aug'])
 
         train_dataloader = self.get_dataloader(train_dataset, train=True)
         val_dataloader = self.get_dataloader(val_dataset, train=False)
 
         # self.model = torch.compile(self.model)
         self.model = torch.jit.script(self.model)
+        self.model = nn.DataParallel(self.model)
 
         optimizer = self.get_optimizer(self.model)
         lr_scheduler = self.get_lr_scheduler(optimizer)
@@ -238,14 +239,22 @@ class Trainer:
                 "distill_loss": [],
             }
             self.model.train()
-            for batch in train_dataloader:
-                data, target = batch["image"].to(self.device), batch["target"].to(self.device)
-                output = self.model(transform_train(data))
-                with torch.no_grad():
-                    output_teacher = self.model(transform_teacher(data))
-                target_loss = self.criterion(output, target).mean()
-                distill_loss = distill_criterion(output, output_teacher).mean()
-                loss = target_loss * alpha + distill_loss * (1.0-alpha)
+            for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}'):
+                target = batch["target"].to(self.device)
+                if isinstance(self.model, nn.DataParallel):
+                    data = batch["image"]
+                    data2 = batch['image2']
+                else:
+                    data = batch["image"].to(self.device)
+                    data2 = batch['image2'].to(self.device)
+
+                with torch.cuda.amp.autocast(enabled=True):
+                    output = self.model(data)
+                    with torch.no_grad():
+                        output_teacher = self.model(data2)
+                    target_loss = self.criterion(output, target).mean()
+                    distill_loss = distill_criterion(output, output_teacher).mean()
+                    loss = target_loss * alpha + distill_loss * (1.0-alpha)
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
