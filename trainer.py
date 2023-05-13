@@ -19,11 +19,12 @@ import numpy as np
 
 
 class Trainer:
-    def __init__(self, model: nn.Module, config: dict, wandb_run: Run =None):
-        self.model = model.cuda()
+    def __init__(self, model: nn.Module, config: dict, wandb_run: Run, device='cuda:0'):
+        self.device = torch.device(device)
+        self.model = model.to(self.device)
         self.config = config
         self.wandb_run = wandb_run
-        self.criterion = self.get_loss_fn(self.config["loss_fn"]).cuda()
+        self.criterion = self.get_loss_fn(self.config["loss_fn"]).to(self.device)
 
     def get_optimizer(self,
                       model: nn.Module
@@ -106,16 +107,30 @@ class Trainer:
                 transform = transforms.Compose([
                     transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1).contiguous()),
                 ]) # output is a (3, 32, 32) uint8 tensor
+            # case "randomcrop":
+            #     transform = transforms.Compose([
+            #         transforms_v2.RandomCrop(32, padding=4),
+            #         transforms_v2.RandomHorizontalFlip(),
+            #         transforms.Lambda(lambda x: x/255.0),
+            #         transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+            #     ])
+            # case "autoaugment":
+            #     transform = transforms.Compose([
+            #         transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+            #         transforms.Lambda(lambda x: x/255.0),
+            #         transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+            #     ])
+
             case "randomcrop":
                 transform = transforms.Compose([
-                    transforms_v2.RandomCrop(32, padding=4),
-                    transforms_v2.RandomHorizontalFlip(),
+                    transforms.RandomResizedCrop(224),
+                    transforms.RandomHorizontalFlip(),
                     transforms.Lambda(lambda x: x/255.0),
                     transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
                 ])
             case "autoaugment":
                 transform = transforms.Compose([
-                    transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+                    transforms.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
                     transforms.Lambda(lambda x: x/255.0),
                     transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
                 ])
@@ -161,7 +176,7 @@ class Trainer:
             }
             self.model.train()
             for batch in train_dataloader:
-                data, target = batch["image"].cuda(), batch["target"].cuda()
+                data, target = batch["image"].to(self.device), batch["target"].to(self.device)
                 output = self.model(transform_train(data))
                 loss = self.criterion(output, target).mean()
                 optimizer.zero_grad()
@@ -224,7 +239,7 @@ class Trainer:
             }
             self.model.train()
             for batch in train_dataloader:
-                data, target = batch["image"].cuda(), batch["target"].cuda()
+                data, target = batch["image"].to(self.device), batch["target"].to(self.device)
                 output = self.model(transform_train(data))
                 with torch.no_grad():
                     output_teacher = self.model(transform_teacher(data))
@@ -295,7 +310,7 @@ class Trainer:
             self.model.train()
             teacher_model.eval() # 이거 train 으로 두면 성능 더 오를듯?
             for batch in train_dataloader:
-                data, target = batch["image"].cuda(), batch["target"].cuda()
+                data, target = batch["image"].to(self.device), batch["target"].to(self.device)
                 with torch.no_grad():
                     output_teacher = teacher_model(transform_teacher(data))
                 output = self.model(transform_student(data))
@@ -366,7 +381,7 @@ class Trainer:
             self.model.train()
             teacher_model.eval() # 이거 train 으로 두면 성능 더 오를듯?
             for batch in train_dataloader:
-                data, target = batch["image"].cuda(), batch["target"].cuda()
+                data, target = batch["image"].to(self.device), batch["target"].to(self.device)
                 with torch.no_grad():
                     output_teacher = teacher_model(transform_teacher(data)) # data shape: (N, 3, 32, 32)
                     output_teacher = output_teacher.reshape((N_aug, -1, output_teacher.shape[-1])).mean(dim=0) # dim[1] == batch_size
@@ -413,7 +428,7 @@ class Trainer:
         }
         total_size = 0
         for batch in dataloader:
-            data, target = batch["image"].cuda(), batch["target"].cuda()
+            data, target = batch["image"].to(self.device), batch["target"].to(self.device)
             total_size += data.size(0)
             output = self.model(data)
             loss = self.criterion(output, target).mean()
@@ -432,8 +447,8 @@ class Trainer:
         score_list = []
         is_noisy_list = []
         for batch in dataloader:
-            data, target = batch["image"].cuda(), batch["target"].cuda()
-            target_gt = batch["target_gt"].cuda()
+            data, target = batch["image"].to(self.device), batch["target"].to(self.device)
+            target_gt = batch["target_gt"].to(self.device)
             losses = []
             for _ in range(10):
                 data += torch.randn_like(data).mul_(0.1)
@@ -487,7 +502,7 @@ class Trainer:
             }
             self.model.train()
             for batch in train_dataloader:
-                data, target = batch["image"].cuda(), batch["target"].cuda()
+                data, target = batch["image"].to(self.device), batch["target"].to(self.device)
                 data = transform_train(data)
                 self.model.train()
                 output = self.model(data)
@@ -566,7 +581,7 @@ class Trainer:
             }
             self.model.train()
             for batch in train_dataloader:
-                data, target = batch["image"].cuda(), batch["target"].cuda()
+                data, target = batch["image"].to(self.device), batch["target"].to(self.device)
                 output = self.model(transform_student(data))
                 with torch.no_grad():
                     output_teacher = self.model(transform_teacher(data))
@@ -642,7 +657,7 @@ class Trainer:
             }
             self.model.train()
             for batch in train_dataloader:
-                data, target = batch["image"].cuda(), batch["target"].cuda()
+                data, target = batch["image"].to(self.device), batch["target"].to(self.device)
                 output = self.model(transform(data))
                 with torch.no_grad():
                     output_teacher = self.model(transform(data))
