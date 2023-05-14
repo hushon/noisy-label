@@ -11,12 +11,14 @@ from typing import Tuple
 from torch.utils.data import Dataset
 
 
+CIFAR10_MEAN_STD = ((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+CIFAR100_MEAN_STD = ((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
+IMAGENET_MEAN_STD = ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
+
+
 def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
-    data_root = "./data"
+    data_root = "/dev/shm/data"
     dataset_name = kwargs.pop('dataset')
-    CIFAR10_MEAN_STD = ((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
-    CIFAR100_MEAN_STD = ((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761))
-    IMAGENET_MEAN_STD = ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 
     match dataset_name:
         case "noisy_cifar10":
