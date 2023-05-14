@@ -88,7 +88,7 @@ class Trainer:
                                     )
             case "generalized_cross_entropy":
                 fn = GeneralizedCrossEntropyLoss(
-                                    num_classes=num_classes,
+                                    num_classes=self.model.fc.out_features,
                                     q=self.config["loss_param"]["q"],
                                     reduction="none",
                                     )
