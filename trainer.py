@@ -108,49 +108,48 @@ class Trainer:
     @staticmethod
     def get_transform(op_name: str, dataset: Dataset):
         dataset_type = type(dataset)
-        match dataset_type:
-            case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N:
-                mean_std = datasets.CIFAR10_MEAN_STD
-            case datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
-                mean_std = datasets.CIFAR100_MEAN_STD
-            case datasets.Clothing1M:
-                mean_std = datasets.IMAGENET_MEAN_STD
-
         match op_name:
             case "totensor":
                 transform = transforms.Compose([
                     transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1).contiguous()),
                 ]) # output is a (3, 32, 32) uint8 tensor
-            # case "randomcrop":
-            #     transform = transforms.Compose([
-            #         transforms_v2.RandomCrop(32, padding=4),
-            #         transforms_v2.RandomHorizontalFlip(),
-            #         transforms.Lambda(lambda x: x/255.0),
-            #         transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
-            #     ])
-            # case "autoaugment":
-            #     transform = transforms.Compose([
-            #         transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
-            #         transforms.Lambda(lambda x: x/255.0),
-            #         transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
-            #     ])
             case "randomcrop":
-                transform = transforms.Compose([
-                    transforms_v2.RandomResizedCrop(224),
-                    transforms_v2.RandomHorizontalFlip(),
-                    transforms_v2.ToImageTensor(),
-                    transforms_v2.Normalize(*mean_std, inplace=True),
-                ])
+                if dataset_type in [datasets.CIFAR10, datasets.NoisyCIFAR10, datasets.NoisyCIFAR3, datasets.CIFAR10N, datasets.CIFAR100, datasets.NoisyCIFAR100, datasets.CIFAR100N]:
+                    transform = nn.Sequential(
+                        transforms_v2.RandomCrop(32, padding=4),
+                        transforms_v2.RandomHorizontalFlip(),
+                        )
+                else:
+                    transform = nn.Sequential(
+                        transforms_v2.RandomResizedCrop(224),
+                        transforms_v2.RandomHorizontalFlip(),
+                        )
             case "autoaugment":
-                transform = transforms.Compose([
-                    transforms_v2.Resize(256),
-                    transforms_v2.CenterCrop(224),
-                    transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
-                    transforms_v2.ToImageTensor(),
-                    transforms_v2.Normalize(*mean_std, inplace=True),
-                ])
+                if dataset_type in [datasets.CIFAR10, datasets.NoisyCIFAR10, datasets.NoisyCIFAR3, datasets.CIFAR10N, datasets.CIFAR100, datasets.NoisyCIFAR100, datasets.CIFAR100N]:
+                    transform = nn.Sequential(
+                        transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+                        )
+                else:
+                    transform = nn.Sequential(
+                        transforms_v2.Resize(256),
+                        transforms_v2.CenterCrop(224),
+                        transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
+                        )
             case _:
                 raise NotImplementedError(op_name)
+        match dataset_type:
+            case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N:
+                normalize = transforms_v2.Normalize(*datasets.CIFAR10_MEAN_STD, inplace=True)
+            case datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
+                normalize = transforms_v2.Normalize(*datasets.CIFAR100_MEAN_STD, inplace=True)
+            case datasets.Clothing1M:
+                normalize = transforms_v2.Normalize(*datasets.IMAGENET_MEAN_STD, inplace=True)
+            case _:
+                raise NotImplementedError(dataset_type)
+        transform = transform + nn.Sequential( # append ToTensor and normalization
+            transforms_v2.ToImageTensor(),
+            normalize,
+            )
         return transform
 
     def get_dataloader(self, dataset: Dataset, train=True) -> DataLoader:
