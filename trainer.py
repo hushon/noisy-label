@@ -1,8 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.utils.data
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 import tqdm.auto as tqdm
 import os
 import wandb
@@ -107,50 +106,54 @@ class Trainer:
         return fn
 
     @staticmethod
-    def get_transform(op_name):
-
+    def get_transform(op_name: str, dataset: Dataset):
+        dataset_type = type(dataset)
         match op_name:
             case "totensor":
                 transform = transforms.Compose([
                     transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1).contiguous()),
                 ]) # output is a (3, 32, 32) uint8 tensor
-            # case "randomcrop":
-            #     transform = transforms.Compose([
-            #         transforms_v2.RandomCrop(32, padding=4),
-            #         transforms_v2.RandomHorizontalFlip(),
-            #         transforms.Lambda(lambda x: x/255.0),
-            #         transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
-            #     ])
-            # case "autoaugment":
-            #     transform = transforms.Compose([
-            #         transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
-            #         transforms.Lambda(lambda x: x/255.0),
-            #         transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
-            #     ])
             case "randomcrop":
-                transform = transforms.Compose([
-                    transforms_v2.RandomResizedCrop(224),
-                    transforms_v2.RandomHorizontalFlip(),
-                    transforms.ToTensor(),
-                    transforms.Normalize(*datasets.IMAGENET_MEAN_STD, inplace=True),
-                ])
+                if dataset_type in [datasets.CIFAR10, datasets.NoisyCIFAR10, datasets.NoisyCIFAR3, datasets.CIFAR10N, datasets.CIFAR100, datasets.NoisyCIFAR100, datasets.CIFAR100N]:
+                    transform = nn.Sequential(
+                        transforms_v2.RandomCrop(32, padding=4),
+                        transforms_v2.RandomHorizontalFlip(),
+                        )
+                else:
+                    transform = nn.Sequential(
+                        transforms_v2.RandomResizedCrop(224),
+                        transforms_v2.RandomHorizontalFlip(),
+                        )
             case "autoaugment":
-                transform = transforms.Compose([
-                    transforms_v2.Resize(256),
-                    transforms_v2.CenterCrop(224),
-                    transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
-                    transforms.ToTensor(),
-                    transforms.Normalize(*datasets.IMAGENET_MEAN_STD, inplace=True),
-                ])
+                if dataset_type in [datasets.CIFAR10, datasets.NoisyCIFAR10, datasets.NoisyCIFAR3, datasets.CIFAR10N, datasets.CIFAR100, datasets.NoisyCIFAR100, datasets.CIFAR100N]:
+                    transform = nn.Sequential(
+                        transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+                        )
+                else:
+                    transform = nn.Sequential(
+                        transforms_v2.Resize(256),
+                        transforms_v2.CenterCrop(224),
+                        transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
+                        )
             case _:
                 raise NotImplementedError(op_name)
+        match dataset_type:
+            case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N:
+                normalize = transforms_v2.Normalize(*datasets.CIFAR10_MEAN_STD, inplace=True)
+            case datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
+                normalize = transforms_v2.Normalize(*datasets.CIFAR100_MEAN_STD, inplace=True)
+            case datasets.Clothing1M:
+                normalize = transforms_v2.Normalize(*datasets.IMAGENET_MEAN_STD, inplace=True)
+            case _:
+                raise NotImplementedError(dataset_type)
+        transform = transform + nn.Sequential( # append ToTensor and normalization
+            transforms_v2.ToImageTensor(),
+            normalize,
+            )
         return transform
 
-    def get_dataloader(self,
-                       dataset: torch.utils.data.Dataset,
-                       train=True
-                       ) -> torch.utils.data.DataLoader:
-        return torch.utils.data.DataLoader(
+    def get_dataloader(self, dataset: Dataset, train=True) -> DataLoader:
+        return DataLoader(
             dataset,
             batch_size=self.config["batch_size"],
             shuffle=train,
@@ -159,37 +162,40 @@ class Trainer:
         )
 
     def fit(self, train_dataset: Dataset, val_dataset: Dataset):
-        train_dataset.transform = self.get_transform('totensor')
-        transform_train = self.get_transform('randomcrop')
-        # transform_train = self.get_transform('autoaugment')
+        train_dataset.transform = self.get_transform('randomcrop', train_dataset)
 
         train_dataloader = self.get_dataloader(train_dataset, train=True)
         val_dataloader = self.get_dataloader(val_dataset, train=False)
 
-        # self.model = torch.compile(self.model)
-        self.model = torch.jit.script(self.model)
+        self.model = torch.compile(self.model)
+        # self.model = torch.jit.script(self.model)
+        dp_model = nn.DataParallel(self.model)
 
         optimizer = self.get_optimizer(self.model)
         lr_scheduler = self.get_lr_scheduler(optimizer)
+        grad_scaler = torch.cuda.amp.GradScaler(enabled=self.config["enable_amp"])
         # artifact = wandb.Artifact(f'checkpoints_{self.wandb_run.id}',
         artifact = wandb.Artifact(f'checkpoints',
                                   type='model',
                                   metadata=self.wandb_run.config['model'])
 
-        for epoch in tqdm.trange(self.config["max_epoch"]):
+        for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
             train_stats = {
                 "loss": [],
                 "t1acc": [],
                 "t5acc": [],
             }
             self.model.train()
-            for batch in train_dataloader:
-                data, target = batch["image"].to(self.device), batch["target"].to(self.device)
-                output = self.model(transform_train(data))
-                loss = self.criterion(output, target).mean()
+            for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
+                target = batch["target"].to(self.device)
+                data = batch["image"]
+                with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
+                    output = dp_model(data)
+                    loss = self.criterion(output, target).mean()
                 optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+                grad_scaler.scale(loss).backward()
+                grad_scaler.step(optimizer)
+                grad_scaler.update()
                 train_stats["loss"].append(loss.detach())
                 train_stats["t1acc"].append(calculate_accuracy(output, target))
                 train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
@@ -214,18 +220,19 @@ class Trainer:
         self.wandb_run.log_artifact(artifact)
 
     def fit_nrosd(self, train_dataset: Dataset, val_dataset: Dataset):
-        train_dataset.transform = self.get_transform(self.config['student_aug'])
-        train_dataset.transform2 = self.get_transform(self.config['teacher_aug'])
+        train_dataset.transform = self.get_transform(self.config['student_aug'], train_dataset)
+        train_dataset.transform2 = self.get_transform(self.config['teacher_aug'], train_dataset)
 
         train_dataloader = self.get_dataloader(train_dataset, train=True)
         val_dataloader = self.get_dataloader(val_dataset, train=False)
 
-        # self.model = torch.compile(self.model)
-        self.model = torch.jit.script(self.model)
-        self.model = nn.DataParallel(self.model)
+        self.model = torch.compile(self.model)
+        # self.model = torch.jit.script(self.model)
+        dp_model = nn.DataParallel(self.model)
 
         optimizer = self.get_optimizer(self.model)
         lr_scheduler = self.get_lr_scheduler(optimizer)
+        grad_scaler = torch.cuda.amp.GradScaler(enabled=self.config["enable_amp"])
         # artifact = wandb.Artifact(f'checkpoints_{self.wandb_run.id}',
         artifact = wandb.Artifact(f'checkpoints',
                                   type='model',
@@ -237,7 +244,7 @@ class Trainer:
                                             )
         alpha = self.config['alpha']
 
-        for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True):
+        for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
             train_stats = {
                 "loss": [],
                 "t1acc": [],
@@ -246,25 +253,20 @@ class Trainer:
                 "distill_loss": [],
             }
             self.model.train()
-            for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}'):
+            for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
                 target = batch["target"].to(self.device)
-                if isinstance(self.model, nn.DataParallel):
-                    data = batch["image"]
-                    data2 = batch['image2']
-                else:
-                    data = batch["image"].to(self.device)
-                    data2 = batch['image2'].to(self.device)
-
-                with torch.cuda.amp.autocast(enabled=True):
-                    output = self.model(data)
+                data, data2 = batch["image"], batch['image2']
+                with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
+                    output = dp_model(data)
                     with torch.no_grad():
-                        output_teacher = self.model(data2)
+                        output_teacher = dp_model(data2)
                     target_loss = self.criterion(output, target).mean()
                     distill_loss = distill_criterion(output, output_teacher).mean()
                     loss = target_loss * alpha + distill_loss * (1.0-alpha)
                 optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
+                grad_scaler.scale(loss).backward()
+                grad_scaler.step(optimizer)
+                grad_scaler.update()
                 train_stats["loss"].append(loss.detach())
                 train_stats["t1acc"].append(calculate_accuracy(output, target))
                 train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
@@ -435,7 +437,7 @@ class Trainer:
 
 
     @torch.no_grad()
-    def _evaluate(self, dataloader: torch.utils.data.DataLoader) -> dict:
+    def _evaluate(self, dataloader: DataLoader) -> dict:
         self.model.eval()
         stats = {
             "loss": [],

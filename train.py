@@ -43,7 +43,10 @@ def main():
 
     train_dataset, test_dataset = get_dataset(**config["data"])
 
-    model = get_model(**config["model"]).cuda()
+    # model = get_model(**config["model"])
+    import torchvision.models
+    model = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V1)
+    model.fc = torch.nn.Linear(2048, 14)
 
     trainer = Trainer(
                     model=model,
