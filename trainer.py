@@ -23,7 +23,7 @@ class Trainer:
         self.model = model.cuda()
         self.config = config
         self.wandb_run = wandb_run
-        self.criterion = self.get_loss_fn(self.config["loss_fn"]).cuda()
+        self.criterion = self.get_loss_fn(self.config["loss_fn"], self.model.fc.out_features, self.config["loss_param"]).cuda()
 
     def get_optimizer(self,
                       model: nn.Module
@@ -68,18 +68,25 @@ class Trainer:
         return lr_scheduler
 
     @staticmethod
-    def get_loss_fn(fn_name) -> nn.Module:
+    def get_loss_fn(fn_name, num_classes, loss_param) -> nn.Module:
         match fn_name:
             case "cross_entropy":
                 fn = nn.CrossEntropyLoss(reduction="none")
             case "mae":
                 fn = MeanAbsoluteError(reduction="none")
             case "reverse_cross_entropy":
-                fn = ReverseCrossEntropyLoss(reduction="none")
+                fn = ReverseCrossEntropyLoss(num_classes,
+                                             reduction="none",
+                                             )
             case "symmetric_cross_entropy":
-                fn = SymmetricCrossEntropyLoss(reduction="none")
+                fn = SymmetricCrossEntropyLoss(num_classes=num_classes,
+                                               reduction="none",
+                                               **loss_param)
             case "generalized_cross_entropy":
-                fn = GeneralizedCrossEntropyLoss(reduction="none")
+                fn = GeneralizedCrossEntropyLoss(num_classes=num_classes,
+                                                 reduction="none",
+                                                 **loss_param
+                                                 )
             case _:
                 raise NotImplementedError(fn_name)
         return fn
