@@ -1,0 +1,29 @@
+data:
+  dataset: noisy_cifar10
+  download: 'true'
+  noise_rate: 0.1
+  noise_type: asymmetric
+  random_seed: 42
+model:
+  architecture: resnet18
+  num_classes: 10
+trainer:
+  batch_size: 128
+  init_lr: 0.1
+  loss_fn: symmetric_cross_entropy
+  loss_param:
+    alpha: 0.1
+    beta: 1.0
+  lr_scheduler: multistep
+  max_epoch: 200
+  momentum: 0.9
+  num_workers: 2
+  optimizer: sgd
+  save_model: 'true'
+  weight_decay: 0.0001
+wandb:
+  entity: seunghee1215
+  mode: online
+  name: NoisyCIFAR10(asymm,0.1)-SCE
+  project: noisy-label
+  save_code: 'true'
