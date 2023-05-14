@@ -61,7 +61,7 @@ class Clothing1M(torchvision.datasets.ImageFolder):
         ) -> None:
         assert split in ['noisy_train', 'clean_train', 'clean_val', 'clean_test']
         self.split = split
-        super().__init__(root=os.path.join(root, 'Clothing1M', self.split),
+        super().__init__(root=os.path.join(root, 'Clothing1M-processed', self.split),
                          transform=transform,
                          target_transform=target_transform,
                          loader=image_loader

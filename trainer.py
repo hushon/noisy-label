@@ -24,7 +24,7 @@ class Trainer:
         self.model = model.to(self.device)
         self.config = config
         self.wandb_run = wandb_run
-        self.criterion = self.get_loss_fn(self.config["loss_fn"], self.model.fc.out_features, self.config["loss_param"]).cuda()
+        self.criterion = self.get_loss_fn(self.config["loss_fn"]).to(self.device)
 
     def get_optimizer(self,
                       model: nn.Module
@@ -68,26 +68,30 @@ class Trainer:
                 raise NotImplementedError(self.config["lr_scheduler"])
         return lr_scheduler
 
-    @staticmethod
-    def get_loss_fn(fn_name, num_classes, loss_param) -> nn.Module:
+    def get_loss_fn(self, fn_name) -> nn.Module:
         match fn_name:
             case "cross_entropy":
                 fn = nn.CrossEntropyLoss(reduction="none")
             case "mae":
                 fn = MeanAbsoluteError(reduction="none")
             case "reverse_cross_entropy":
-                fn = ReverseCrossEntropyLoss(num_classes,
-                                             reduction="none",
-                                             )
+                fn = ReverseCrossEntropyLoss(
+                                    num_classes=self.model.fc.out_features,
+                                    reduction="none",
+                                    )
             case "symmetric_cross_entropy":
-                fn = SymmetricCrossEntropyLoss(num_classes=num_classes,
-                                               reduction="none",
-                                               **loss_param)
+                fn = SymmetricCrossEntropyLoss(
+                                    alpha=self.config["loss_param"]["alpha"],
+                                    beta=self.config["loss_param"]["beta"],
+                                    num_classes=self.model.fc.out_features,
+                                    reduction="none",
+                                    )
             case "generalized_cross_entropy":
-                fn = GeneralizedCrossEntropyLoss(num_classes=num_classes,
-                                                 reduction="none",
-                                                 **loss_param
-                                                 )
+                fn = GeneralizedCrossEntropyLoss(
+                                    num_classes=num_classes,
+                                    q=self.config["loss_param"]["q"],
+                                    reduction="none",
+                                    )
             case _:
                 raise NotImplementedError(fn_name)
         return fn
@@ -148,6 +152,7 @@ class Trainer:
                 raise NotImplementedError(dataset_type)
         transform = transform + nn.Sequential( # append ToTensor and normalization
             transforms_v2.ToImageTensor(),
+            transforms_v2.ConvertDtype(),
             normalize,
             )
         return transform
