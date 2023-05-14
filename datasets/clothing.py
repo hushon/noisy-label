@@ -84,3 +84,53 @@ class Clothing1M(torchvision.datasets.ImageFolder):
                 'image2': self.transform2(sample),
             })
         return output
+
+class Clothing1MOfficial(torchvision.datasets.ImageFolder):
+    """
+        Clothing1M dataset for official dataset structure.
+
+        [Args]
+
+        split   str         noisy_train (default)
+                            clean_train
+                            clean_val
+                            clean_test
+
+        transform           pytorch transform
+
+        target_transform    pytorch target transform
+    """
+    def __init__(
+        self,
+        root: str,
+        split: str = 'noisy_train',
+        transform = None,
+        transform2 = None,
+        target_transform = None,
+        ) -> None:
+        assert split in ['noisy_train', 'clean_train', 'clean_val', 'clean_test']
+        self.split = split
+        super().__init__(root=os.path.join(root, 'Clothing1M', self.split),
+                         transform=transform,
+                         target_transform=target_transform,
+                         loader=image_loader
+                         )
+        self.transform2 = transform2
+
+    def __getitem__(self, index):
+        path, target = self.samples[index]
+        sample = self.loader(path)
+        if self.transform is not None:
+            image = self.transform(sample)
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+        output = {
+            'image': image,
+            'target': target,
+        }# No target_gt: real-world noisy dataset.
+        if self.transform2 is not None:
+            output.update({
+                'image2': self.transform2(sample),
+            })
+        return output
+
