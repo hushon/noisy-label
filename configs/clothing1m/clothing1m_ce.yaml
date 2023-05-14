@@ -4,6 +4,7 @@ data:
 model:
   architecture: resnet50
   num_classes: 14
+  pretrained: true
 
 wandb:
   mode: online # "disabled" or "online"
