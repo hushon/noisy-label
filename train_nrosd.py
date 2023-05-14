@@ -19,8 +19,9 @@ torch.manual_seed(42)
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = True
 
-torch.backends.cuda.matmul.allow_tf32 = False
-torch.backends.cudnn.allow_tf32 = False
+# torch.backends.cuda.matmul.allow_tf32 = True
+# torch.backends.cudnn.allow_tf32 = True
+# torch.set_float32_matmul_precision('medium')
 
 
 parser = argparse.ArgumentParser(description='Training Config', add_help=False)
@@ -43,7 +44,10 @@ def main():
 
     train_dataset, test_dataset = get_dataset(**config["data"])
 
-    model = get_model(**config["model"]).cuda()
+    # model = get_model(**config["model"])
+    import torchvision.models
+    model = torchvision.models.resnet50(weights=torchvision.models.ResNet50_Weights.IMAGENET1K_V1)
+    model.fc = torch.nn.Linear(2048, 14)
 
     trainer = Trainer(
                     model=model,
