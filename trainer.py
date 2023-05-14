@@ -109,10 +109,10 @@ class Trainer:
     def get_transform(op_name: str, dataset: Dataset):
         dataset_type = type(dataset)
         match op_name:
-            case "totensor":
-                transform = transforms.Compose([
-                    transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1).contiguous()),
-                ]) # output is a (3, 32, 32) uint8 tensor
+            # case "totensor":
+            #     transform = transforms.Compose([
+            #         transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1).contiguous()),
+            #     ]) # output is a (3, 32, 32) uint8 tensor
             case "randomcrop":
                 if dataset_type in [datasets.CIFAR10, datasets.NoisyCIFAR10, datasets.NoisyCIFAR3, datasets.CIFAR10N, datasets.CIFAR100, datasets.NoisyCIFAR100, datasets.CIFAR100N]:
                     transform = nn.Sequential(
