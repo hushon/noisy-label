@@ -54,7 +54,7 @@ class ReverseCrossEntropyLoss(nn.Module):
         pred = F.softmax(pred, dim=1)
         pred = torch.clamp(pred, min=1e-7, max=1.0)
         label_one_hot = F.one_hot(labels, self.num_classes).float()
-        label_one_hot = torch.clamp(label_one_hot, min=1e-4, max=1.0)
+        label_one_hot = torch.clamp(label_one_hot, min=1e-4, max=1.0) # 1e-4 indicates A = -4 in RCE
         loss = (-1*torch.sum(pred * torch.log(label_one_hot), dim=1))
         if self.reduction == "mean":
             loss = loss.mean()
@@ -106,17 +106,27 @@ class GeneralizedCrossEntropyLoss(nn.Module):
     training deep neural networks with noisy labels."
     Advances in neural information processing systems 31 (2018).
     '''
-    def __init__(self, num_classes, q=0.7):
+    def __init__(self, num_classes, q=0.7, reduction="mean"):
         super().__init__()
         self.num_classes = num_classes
         self.q = q
+        self.reduction = reduction
 
     def forward(self, pred, labels):
         pred = F.softmax(pred, dim=1)
         pred = torch.clamp(pred, min=1e-7, max=1.0)
         label_one_hot = F.one_hot(labels, self.num_classes).float()
-        gce = (1. - torch.pow(torch.sum(label_one_hot * pred, dim=1), self.q)) / self.q
-        return gce.mean()
+        loss = (1. - torch.pow(torch.sum(label_one_hot * pred, dim=1), self.q)) / self.q
+
+        if self.reduction == "mean":
+            loss = loss.mean()
+        elif self.reduction == "sum":
+            loss = loss.sum()
+        elif self.reduction == "none":
+            loss = loss
+        else:
+            raise NotImplementedError
+        return loss
 
 
 class KLDivDistillationLoss(nn.KLDivLoss):

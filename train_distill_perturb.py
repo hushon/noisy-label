@@ -51,9 +51,11 @@ def main():
     import copy
     teacher_model = copy.deepcopy(model)
     if config['wandb']['mode'] == 'online':
-        WANDB_RUN_ID = "mquy2drg" # NoisyCIFAR10(symm,0.4)-CE
+        # WANDB_RUN_ID = "mquy2drg" # NoisyCIFAR10(symm,0.4)-CE
+        WANDB_RUN_ID = "ozf6ujt1" # NoisyCIFAR10(symm,0.5)-CE-randflip
         # WANDB_RUN_ID = "ccnf390c" # NoisyCIFAR10(symm,0.4)-MAE
-        checkpoint = wandb.restore("model_199.pth", run_path=f"siit-iitp/noisy-label/{WANDB_RUN_ID}", replace=True)
+        #checkpoint = wandb.restore("model_199.pth", run_path=f"siit-iitp/noisy-label/{WANDB_RUN_ID}", replace=True)
+        checkpoint = wandb.restore("model_199.pth", run_path=f"seunghee1215/noisy-label/{WANDB_RUN_ID}", replace=True)
         teacher_model.load_state_dict(torch.load(checkpoint.name, map_location="cuda"))
     else:
         print("Wandb is disabled.. The teacher model is randomly initialized.")
