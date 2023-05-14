@@ -85,9 +85,29 @@ class Clothing1M(torchvision.datasets.ImageFolder):
             })
         return output
 
-class Clothing1MOfficial(torchvision.datasets.ImageFolder):
+class Clothing1MOfficial(torch.utils.data.Dataset):
     """
         Clothing1M dataset for official dataset structure.
+        Adapted from https://github.com/LiJunnan1992/DivideMix/blob/master/dataloader_clothing1M.py
+
+        [Official Dataset Structure]
+        github link: https://github.com/Cysu/noisy_label
+
+        {dataset_root}/clothing1M/
+        ├── category_names_chn.txt
+        ├── category_names_eng.txt
+        ├── clean_label_kv.txt
+        ├── clean_test_key_list.txt
+        ├── clean_train_key_list.txt
+        ├── clean_val_key_list.txt
+        ├── images
+        │   ├── 0
+        │   ├── ⋮
+        │   └── 9
+        ├── noisy_label_kv.txt
+        ├── noisy_train_key_list.txt
+        ├── README.md
+        └── venn.png
 
         [Args]
 
@@ -108,18 +128,28 @@ class Clothing1MOfficial(torchvision.datasets.ImageFolder):
         transform2 = None,
         target_transform = None,
         ) -> None:
+        super().__init__()
         assert split in ['noisy_train', 'clean_train', 'clean_val', 'clean_test']
         self.split = split
-        super().__init__(root=os.path.join(root, 'Clothing1M', self.split),
-                         transform=transform,
-                         target_transform=target_transform,
-                         loader=image_loader
-                         )
+
+        self.root = os.path.join(root, 'Clothing1M') # TODO: check them
+        self.transform = transform
+        self.target_transform = target_transform
+        self.loader = image_loader
+
         self.transform2 = transform2
 
+        self.img_list = self._get_img_list()
+        self.label_list = self._get_label_dict()
+
+    def __len__(self):
+        return len(self.img_list)
+
     def __getitem__(self, index):
-        path, target = self.samples[index]
-        sample = self.loader(path)
+        path = self.img_list[index]
+        target = self.label_list[path]
+
+        sample = self.loader(path) # Image.open(path).convert("RGB")
         if self.transform is not None:
             image = self.transform(sample)
         if self.target_transform is not None:
@@ -127,10 +157,30 @@ class Clothing1MOfficial(torchvision.datasets.ImageFolder):
         output = {
             'image': image,
             'target': target,
-        }# No target_gt: real-world noisy dataset.
+        }# No target_gt: real-world noisy dataset. # TODO: clean key_list..? clean yes..?
         if self.transform2 is not None:
             output.update({
                 'image2': self.transform2(sample),
             })
         return output
 
+    def _get_img_list(self):
+        key_list_path = os.path.join(self.root, f"{self.split}_key_list.txt")
+        img_list = []
+        with open(key_list_path, 'r') as f:
+            lines = f.read().splitlines()
+            for l in lines:
+                img_path = os.path.join(self.root, l[7:]) # TODO: better code..bb
+                img_list.append(img_path)
+        return img_list
+
+    def _get_label_dict(self):
+        label_path = os.path.join(self.root, f"{self.split.split("_")[0]}_label_kv.txt")
+        label_dict = {}
+        with open(label_path, 'r') as f:
+            lines = f.read().splitlines()
+            for l in lines:
+                entry = l.split()
+                img_path = os.path.join(self.root, entry[0][7:])
+                label_dict[img_path] = int(entry[1])
+        return label_dict
