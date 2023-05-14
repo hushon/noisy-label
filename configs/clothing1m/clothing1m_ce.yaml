@@ -2,7 +2,7 @@ data:
   dataset: clothing1m
 
 model:
-  architecture: resnet50
+  architecture: resnet50_torchvision
   num_classes: 14
   pretrained: true
 

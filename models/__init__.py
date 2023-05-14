@@ -1,5 +1,5 @@
 from torch import nn
-import resnet
+from models import resnet
 # from .resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 from .module import MCDropout, GaussianDropout, GaussianMCDropout, \
     MeanAbsoluteError, LambdaLayer, KLDivDistillationLoss, \
