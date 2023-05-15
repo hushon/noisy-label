@@ -141,7 +141,7 @@ class Trainer:
                         )
             case _:
                 raise NotImplementedError(op_name)
-        match dataset_type:
+        match dataset_type: # image normalization parameters
             case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N:
                 normalize = transforms_v2.Normalize(*datasets.CIFAR10_MEAN_STD, inplace=True)
             case datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
