@@ -453,8 +453,9 @@ class Trainer:
         for batch in dataloader:
             data, target = batch["image"].to(self.device), batch["target"].to(self.device)
             total_size += data.size(0)
-            output = self.model(data)
-            loss = self.criterion(output, target).mean()
+            with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
+                output = self.model(data).float()
+                loss = self.criterion(output, target).mean()
             stats["loss"].append(loss.detach()*data.size(0))
             stats["t1acc"].append(calculate_accuracy(output, target)*data.size(0))
             stats["t5acc"].append(calculate_accuracy(output, target, k=5)*data.size(0))

@@ -261,8 +261,8 @@ class CIFAR10N(torchvision.datasets.CIFAR10):
     Re-annotation of the CIFAR-10/100 data which contains real-world human annotation errors.
     """
     cifarn_url = 'http://www.yliuu.com/web-cifarN/files/CIFAR-N-1.zip'
-    md5 = '666bf3cff3a944c245f2b6f62af4b919'
-    filename = 'CIFAR-10_human.pt'
+    cifarn_md5 = '666bf3cff3a944c245f2b6f62af4b919'
+    cifar10n_filename = 'CIFAR-10_human.pt'
 
     def __init__(
             self,
@@ -281,12 +281,12 @@ class CIFAR10N(torchvision.datasets.CIFAR10):
         self.transform2 = transform2
 
         if download:
-            if check_integrity(os.path.join(self.root, 'CIFAR-N-1.zip'), self.md5):
+            if check_integrity(os.path.join(self.root, 'CIFAR-N-1.zip'), self.cifarn_md5):
                 print('Files already downloaded and verified')
             else:
-                download_and_extract_archive(self.cifarn_url, root, md5=self.md5)
+                download_and_extract_archive(self.cifarn_url, root, md5=self.cifarn_md5)
 
-        noise_file = torch.load(os.path.join(self.root, 'CIFAR-N', self.filename), map_location=torch.device('cpu'))
+        noise_file = torch.load(os.path.join(self.root, 'CIFAR-N', self.cifar10n_filename), map_location=torch.device('cpu'))
         self.targets_gt = noise_file['clean_label']
         self.targets = noise_file[self.noise_type]
 
@@ -318,27 +318,29 @@ class CIFAR100N(torchvision.datasets.CIFAR100):
     Re-annotation of the CIFAR-10/100 data which contains real-world human annotation errors.
     """
     cifarn_url = 'http://www.yliuu.com/web-cifarN/files/CIFAR-N-1.zip'
-    md5 = '666bf3cff3a944c245f2b6f62af4b919'
-    filename = 'CIFAR-100_human.pt'
+    cifarn_md5 = '666bf3cff3a944c245f2b6f62af4b919'
+    cifar100n_filename = 'CIFAR-100_human.pt'
 
     def __init__(
             self,
             root: str,
             train: bool = True,
             transform = None,
+            transform2 = None,
             target_transform = None,
             download: bool = False,
             ) -> None:
         super().__init__(root, train=train, transform=transform,
             target_transform=target_transform, download=download)
+        self.transform2 = transform2
 
         if download:
-            if check_integrity(os.path.join(self.root, 'CIFAR-N-1.zip'), self.md5):
+            if check_integrity(os.path.join(self.root, 'CIFAR-N-1.zip'), self.cifarn_md5):
                 print('Files already downloaded and verified')
             else:
-                download_and_extract_archive(self.cifarn_url, root, md5=self.md5)
+                download_and_extract_archive(self.cifarn_url, root, md5=self.cifarn_md5)
 
-        noise_file = torch.load(os.path.join(self.root, 'CIFAR-N', self.filename), map_location=torch.device('cpu'))
+        noise_file = torch.load(os.path.join(self.root, 'CIFAR-N', self.cifar100n_filename), map_location=torch.device('cpu'))
         self.targets_gt = noise_file['clean_label']
         self.targets = noise_file['noisy_label']
         self.clean_coarse_label = noise_file['clean_coarse_label']

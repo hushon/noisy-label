@@ -78,6 +78,32 @@ def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
             ])
             train_dataset = Clothing1M(data_root, split='noisy_train', transform=transform_train, **kwargs)
             test_dataset = Clothing1M(data_root, split='clean_test', transform=transform_test, **kwargs)
+        case "cifar10n":
+            transform_train = transforms.Compose([
+                transforms_v2.RandomCrop(32, padding=[4,]),
+                transforms_v2.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+            ])
+            transform_test = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+            ])
+            train_dataset = CIFAR10N(data_root, transform=transform_train, **kwargs)
+            test_dataset = CIFAR10(data_root, train=False, transform=transform_test)
+        case "cifar100n":
+            transform_train = transforms.Compose([
+                transforms_v2.RandomCrop(32, padding=[4,]),
+                transforms_v2.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+            ])
+            transform_test = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+            ])
+            train_dataset = CIFAR100N(data_root, transform=transform_train, **kwargs)
+            test_dataset = CIFAR100(data_root, train=False, transform=transform_test)
 
         case _:
             raise NotImplementedError
