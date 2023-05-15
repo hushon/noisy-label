@@ -4,6 +4,7 @@ import numpy as np
 from typing import Tuple, Any
 import os
 from torchvision.datasets.utils import download_and_extract_archive, check_integrity
+from PIL import Image
 
 
 class Categorical(torch.distributions.Categorical):
@@ -109,6 +110,7 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
             root: str,
             train: bool = True,
             transform = None,
+            transform2 = None,
             target_transform = None,
             download: bool = False,
             noise_rate: float = 0.2,
@@ -121,6 +123,7 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
         assert 0.0 <= noise_rate <= 1.0
         assert noise_type in ["symmetric", "asymmetric"]
 
+        self.transform2 = transform2
         self.data = np.array(self.data)
         self.targets = np.array(self.targets)
         self.noise_rate = noise_rate
@@ -159,12 +162,25 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
         self.targets = Categorical(torch.tensor(out_dist)).sample(generator=self.rng).numpy()
 
     def __getitem__(self, index):
-        img, target = super().__getitem__(index)
-        return {
-            'image': img,
+        img, target = self.data[index], self.targets[index]
+        img = Image.fromarray(img)
+
+        if self.transform is not None:
+            img1 = self.transform(img)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        output = {
+            'image': img1,
             'target': target,
             'target_gt': self.targets_gt[index],
         }
+        if self.transform2 is not None:
+            output.update({
+                'image2': self.transform2(img),
+            })
+        return output
 
 
 class NoisyCIFAR100(torchvision.datasets.CIFAR100):
@@ -175,6 +191,7 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
             root: str,
             train: bool = True,
             transform = None,
+            transform2 = None,
             target_transform = None,
             download: bool = False,
             noise_rate: float = 0.2,
@@ -187,6 +204,7 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
         assert 0.0 <= noise_rate <= 1.0
         assert noise_type in ["symmetric", "asymmetric"]
 
+        self.transform2 = transform2
         self.data = np.array(self.data)
         self.targets = np.array(self.targets)
         self.noise_rate = noise_rate
@@ -216,12 +234,25 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
         self.targets = Categorical(torch.tensor(out_dist)).sample(generator=self.rng).numpy()
 
     def __getitem__(self, index):
-        img, target = super().__getitem__(index)
-        return {
-            'image': img,
+        img, target = self.data[index], self.targets[index]
+        img = Image.fromarray(img)
+
+        if self.transform is not None:
+            img1 = self.transform(img)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        output = {
+            'image': img1,
             'target': target,
             'target_gt': self.targets_gt[index],
         }
+        if self.transform2 is not None:
+            output.update({
+                'image2': self.transform2(img),
+            })
+        return output
 
 
 class CIFAR10N(torchvision.datasets.CIFAR10):
@@ -238,6 +269,7 @@ class CIFAR10N(torchvision.datasets.CIFAR10):
             root: str,
             train: bool = True,
             transform = None,
+            transform2 = None,
             target_transform = None,
             download: bool = False,
             noise_type: str = "worse_label",
@@ -246,6 +278,7 @@ class CIFAR10N(torchvision.datasets.CIFAR10):
             target_transform=target_transform, download=download)
         assert noise_type in ['clean_label', 'worse_label', 'aggre_label', 'random_label1', 'random_label2', 'random_label3']
         self.noise_type = noise_type
+        self.transform2 = transform2
 
         if download:
             if check_integrity(os.path.join(self.root, 'CIFAR-N-1.zip'), self.md5):
@@ -257,13 +290,26 @@ class CIFAR10N(torchvision.datasets.CIFAR10):
         self.targets_gt = noise_file['clean_label']
         self.targets = noise_file[self.noise_type]
 
-    def __getitem__(self, index: int):
-        img, target = super().__getitem__(index)
-        return {
-            "image": img,
-            "target": target,
-            "target_gt": self.targets_gt[index],
+    def __getitem__(self, index):
+        img, target = self.data[index], self.targets[index]
+        img = Image.fromarray(img)
+
+        if self.transform is not None:
+            img1 = self.transform(img)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        output = {
+            'image': img1,
+            'target': target,
+            'target_gt': self.targets_gt[index],
         }
+        if self.transform2 is not None:
+            output.update({
+                'image2': self.transform2(img),
+            })
+        return output
 
 
 class CIFAR100N(torchvision.datasets.CIFAR100):
@@ -298,13 +344,26 @@ class CIFAR100N(torchvision.datasets.CIFAR100):
         self.clean_coarse_label = noise_file['clean_coarse_label']
         self.noisy_coarse_label = noise_file['noisy_coarse_label']
 
-    def __getitem__(self, index: int):
-        img, target = super().__getitem__(index)
-        return {
-            "image": img,
-            "target": target,
-            "target_gt": self.targets_gt[index],
+    def __getitem__(self, index):
+        img, target = self.data[index], self.targets[index]
+        img = Image.fromarray(img)
+
+        if self.transform is not None:
+            img1 = self.transform(img)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        output = {
+            'image': img1,
+            'target': target,
+            'target_gt': self.targets_gt[index],
         }
+        if self.transform2 is not None:
+            output.update({
+                'image2': self.transform2(img),
+            })
+        return output
 
 
 class NoisyCIFAR3(torchvision.datasets.CIFAR10):
