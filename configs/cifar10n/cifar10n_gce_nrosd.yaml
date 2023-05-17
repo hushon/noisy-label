@@ -27,7 +27,7 @@ trainer:
   alpha: 0.5
   teacher_aug: autoaugment
   student_aug: randomcrop
-  distill_loss_fn: kl_div
+  distill_loss_fn: smoothed_l1_dist
   temperature: 1.0
   enable_amp: false
   loss_param:

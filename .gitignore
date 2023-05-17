@@ -8,3 +8,4 @@ wandb/
 temp/
 */.ipynb_checkpoints
 .ipynb_checkpoints
+*.code-workspace

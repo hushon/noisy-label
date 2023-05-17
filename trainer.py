@@ -158,7 +158,8 @@ class Trainer:
         return transform
 
     def get_dataloader(self, dataset: Dataset, train=True) -> DataLoader:
-        return DataLoader(
+        # return DataLoader(
+        return datasets.MultiEpochsDataLoader(
             dataset,
             batch_size=self.config["batch_size"],
             shuffle=train,
