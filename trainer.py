@@ -19,7 +19,7 @@ import datasets
 
 
 class Trainer:
-    def __init__(self, model: nn.Module, config: dict, wandb_run: Run, device='cuda:0'):
+    def __init__(self, model: nn.Module, config: dict, wandb_run: Run=None, device='cuda:0'):
         self.device = torch.device(device)
         self.model = model.to(self.device)
         self.config = config
