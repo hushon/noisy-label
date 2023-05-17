@@ -1,19 +1,19 @@
 data:
-  dataset: noisy_cifar100
-  noise_rate: 0.2
+  dataset: noisy_cifar10
+  noise_rate: 0.4
   noise_type: symmetric
   random_seed: 42
   download: true
 
 model:
   architecture: resnet18
-  num_classes: 100
+  num_classes: 10
 
 wandb:
   mode: online # "disabled" or "online"
   entity: hyounguk-shon
   project: noisy-label
-  name: NoisyCIFAR100(symm,0.2)-NROSD-CE
+  name: NoisyCIFAR10(symm,0.4)-NROSD-CE-nostopgrad
   save_code: true
 
 trainer:
@@ -32,3 +32,4 @@ trainer:
   student_aug: randomcrop
   distill_loss_fn: kl_div
   temperature: 1.0
+  enable_amp: true

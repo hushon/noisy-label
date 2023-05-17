@@ -720,6 +720,81 @@ class Trainer:
                 artifact.add_file(filepath)
         self.wandb_run.log_artifact(artifact)
 
+    def fit_nrosd_ablation1(self, train_dataset: Dataset, val_dataset: Dataset):
+        train_dataset.transform = self.get_transform(self.config['student_aug'], train_dataset)
+        train_dataset.transform2 = self.get_transform(self.config['teacher_aug'], train_dataset)
+
+        train_dataloader = self.get_dataloader(train_dataset, train=True)
+        val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        self.model = torch.compile(self.model)
+        # self.model = torch.jit.script(self.model)
+        dp_model = nn.DataParallel(self.model)
+
+        optimizer = self.get_optimizer(self.model)
+        lr_scheduler = self.get_lr_scheduler(optimizer)
+        grad_scaler = torch.cuda.amp.GradScaler(enabled=self.config["enable_amp"])
+        # artifact = wandb.Artifact(f'checkpoints_{self.wandb_run.id}',
+        artifact = wandb.Artifact(f'checkpoints',
+                                  type='model',
+                                  metadata=self.wandb_run.config['model'])
+
+        distill_criterion = self.get_distill_loss_fn(
+                                            self.config["distill_loss_fn"],
+                                            self.config['temperature']
+                                            )
+        alpha = self.config['alpha']
+
+        for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
+            train_stats = {
+                "loss": [],
+                "t1acc": [],
+                "t5acc": [],
+                "target_loss": [],
+                "distill_loss": [],
+            }
+            self.model.train()
+            for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
+                target = batch["target"].to(self.device)
+                data, data2 = batch["image"], batch['image2']
+                with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
+                    output = dp_model(data)
+                    output_teacher = dp_model(data2)
+                    target_loss = self.criterion(output, target).mean()
+                    distill_loss = distill_criterion(output, output_teacher).mean()
+                    loss = target_loss * alpha + distill_loss * (1.0-alpha)
+                optimizer.zero_grad()
+                grad_scaler.scale(loss).backward()
+                grad_scaler.step(optimizer)
+                grad_scaler.update()
+                train_stats["loss"].append(loss.detach())
+                train_stats["t1acc"].append(calculate_accuracy(output, target))
+                train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
+                train_stats["target_loss"].append(target_loss.detach())
+                train_stats["distill_loss"].append(distill_loss.detach())
+            lr_scheduler.step()
+            train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
+            train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
+            train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
+            train_stats["target_loss"] = torch.stack(train_stats["target_loss"]).mean().item()
+            train_stats["distill_loss"] = torch.stack(train_stats["distill_loss"]).mean().item()
+
+            val_stats = self._evaluate(val_dataloader)
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
+            self.wandb_run.log(
+                {
+                    "learning_rate": lr_scheduler.get_last_lr()[0],
+                    **{'train_'+k: v for k, v in train_stats.items()},
+                    **{'val_'+k: v for k, v in val_stats.items()},
+                }
+            )
+            if self.config["save_model"] and (epoch+1)%10 == 0:
+                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
+                torch.save(self.model.state_dict(), filepath)
+                artifact.add_file(filepath)
+        self.wandb_run.log_artifact(artifact)
+
+
 
 @torch.no_grad()
 def calculate_accuracy(pred: torch.Tensor, target: torch.Tensor, k=1):

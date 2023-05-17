@@ -27,3 +27,4 @@ trainer:
   num_workers: 2
   batch_size: 128
   save_model: true
+  enable_amp: true
