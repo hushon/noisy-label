@@ -19,9 +19,9 @@ torch.manual_seed(42)
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = True
 
-# torch.backends.cuda.matmul.allow_tf32 = True
-# torch.backends.cudnn.allow_tf32 = True
-# torch.set_float32_matmul_precision('medium')
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+torch.set_float32_matmul_precision('high')
 
 
 parser = argparse.ArgumentParser(description='Training Config', add_help=False)

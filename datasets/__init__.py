@@ -8,7 +8,7 @@ torchvision.disable_beta_transforms_warning()
 from torchvision import transforms
 import torchvision.transforms.v2 as transforms_v2
 from typing import Tuple
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 
 CIFAR10_MEAN_STD = ((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
@@ -78,8 +78,65 @@ def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
             ])
             train_dataset = Clothing1M(data_root, split='noisy_train', transform=transform_train, **kwargs)
             test_dataset = Clothing1M(data_root, split='clean_test', transform=transform_test, **kwargs)
+        case "cifar10n":
+            transform_train = transforms.Compose([
+                transforms_v2.RandomCrop(32, padding=[4,]),
+                transforms_v2.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+            ])
+            transform_test = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+            ])
+            train_dataset = CIFAR10N(data_root, transform=transform_train, **kwargs)
+            test_dataset = CIFAR10(data_root, train=False, transform=transform_test)
+        case "cifar100n":
+            transform_train = transforms.Compose([
+                transforms_v2.RandomCrop(32, padding=[4,]),
+                transforms_v2.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+            ])
+            transform_test = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+            ])
+            train_dataset = CIFAR100N(data_root, transform=transform_train, **kwargs)
+            test_dataset = CIFAR100(data_root, train=False, transform=transform_test)
 
         case _:
             raise NotImplementedError
 
     return train_dataset, test_dataset
+
+
+class MultiEpochsDataLoader(DataLoader):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._DataLoader__initialized = False
+        self.batch_sampler = _RepeatSampler(self.batch_sampler)
+        self._DataLoader__initialized = True
+        self.iterator = super().__iter__()
+
+    def __len__(self):
+        return len(self.batch_sampler.sampler)
+
+    def __iter__(self):
+        for i in range(len(self)):
+            yield next(self.iterator)
+
+
+class _RepeatSampler(object):
+    """ Sampler that repeats forever.
+    Args:
+        sampler (Sampler)
+    """
+
+    def __init__(self, sampler):
+        self.sampler = sampler
+
+    def __iter__(self):
+        while True:
+            yield from iter(self.sampler)

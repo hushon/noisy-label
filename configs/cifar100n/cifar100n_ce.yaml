@@ -1,8 +1,5 @@
 data:
-  dataset: noisy_cifar100
-  noise_rate: 0.2
-  noise_type: symmetric
-  random_seed: 42
+  dataset: cifar100n
   download: true
 
 model:
@@ -11,9 +8,9 @@ model:
 
 wandb:
   mode: online # "disabled" or "online"
-  entity: hyounguk-shon
+  entity: siit-iitp
   project: noisy-label
-  name: NoisyCIFAR100(symm,0.2)-NROSD-CE
+  name: CIFAR100N-CE
   save_code: true
 
 trainer:
@@ -23,12 +20,9 @@ trainer:
   weight_decay: 1.0e-4
   lr_scheduler: multistep
   max_epoch: 200
-  num_workers: 2
+  num_workers: 8
   batch_size: 128
   save_model: true
   loss_fn: cross_entropy
   alpha: 0.5
-  teacher_aug: autoaugment
-  student_aug: randomcrop
-  distill_loss_fn: kl_div
-  temperature: 1.0
+  enable_amp: false
