@@ -32,3 +32,4 @@ trainer:
   student_aug: randomcrop
   distill_loss_fn: kl_div
   temperature: 1.0
+  enable_amp: true
