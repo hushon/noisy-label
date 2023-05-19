@@ -8,7 +8,7 @@ import wandb
 from wandb.sdk.wandb_run import Run
 import pdb
 from models import MeanAbsoluteError, ReverseCrossEntropyLoss, SymmetricCrossEntropyLoss, \
-    GeneralizedCrossEntropyLoss
+    GeneralizedCrossEntropyLoss, CrossEntropyDistillationLoss
 from models import KLDivDistillationLoss, L1DistillationLoss, SmoothL1DistillationLoss
 import torchvision
 torchvision.disable_beta_transforms_warning()
@@ -105,6 +105,8 @@ class Trainer:
                 fn = L1DistillationLoss(temperature, reduction="none")
             case "smoothed_l1_dist":
                 fn = SmoothL1DistillationLoss(temperature, reduction="none")
+            case "cross_entropy":
+                fn = CrossEntropyDistillationLoss(temperature, reduction="none")
             case _:
                 raise NotImplementedError(fn_name)
         return fn

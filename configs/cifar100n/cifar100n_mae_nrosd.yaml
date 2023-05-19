@@ -10,7 +10,7 @@ wandb:
   mode: online # "disabled" or "online"
   entity: hyounguk-shon
   project: noisy-label
-  name: CIFAR10N-NROSD-MAE
+  name: CIFAR100N-NROSD-MAE
   save_code: true
 
 trainer:

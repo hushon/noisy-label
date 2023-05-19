@@ -186,6 +186,22 @@ class SmoothL1DistillationLoss(nn.SmoothL1Loss):
         return loss * (self.temperature**2)
 
 
+class CrossEntropyDistillationLoss(nn.CrossEntropyLoss):
+    """
+    Modified nn.CrossEntropyLoss which
+    takes in logits instead of probabilities
+    """
+    def __init__(self, temperature=1.0, reduction="none"):
+        super().__init__(reduction=reduction)
+        self.temperature = temperature
+
+    def forward(self, pred_logits, target_logits):
+        x = pred_logits.div(self.temperature)
+        y = target_logits.div(self.temperature).softmax(-1)
+        loss = super().forward(x, y)
+        return loss * (self.temperature**2)
+
+
 class MCDropout(nn.Dropout):
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         return F.dropout(input, self.p, True, self.inplace)
