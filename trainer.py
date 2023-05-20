@@ -120,27 +120,34 @@ class Trainer:
             #         transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1).contiguous()),
             #     ]) # output is a (3, 32, 32) uint8 tensor
             case "randomcrop":
-                if dataset_type in [datasets.CIFAR10, datasets.NoisyCIFAR10, datasets.NoisyCIFAR3, datasets.CIFAR10N, datasets.CIFAR100, datasets.NoisyCIFAR100, datasets.CIFAR100N]:
-                    transform = nn.Sequential(
-                        transforms_v2.RandomCrop(32, padding=4),
-                        transforms_v2.RandomHorizontalFlip(),
-                        )
-                else:
-                    transform = nn.Sequential(
-                        transforms_v2.RandomResizedCrop(224),
-                        transforms_v2.RandomHorizontalFlip(),
-                        )
+                match dataset_type:
+                    case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
+                        transform = nn.Sequential(
+                            transforms_v2.RandomCrop(32, padding=4),
+                            transforms_v2.RandomHorizontalFlip(),
+                            )
+                    case datasets.Clothing1M:
+                        transform = nn.Sequential(
+                            transforms.Resize(256),
+                            transforms.RandomCrop(224),
+                            transforms.RandomHorizontalFlip(),
+                            )
+                    case _:
+                        raise NotImplementedError(dataset_type)
             case "autoaugment":
-                if dataset_type in [datasets.CIFAR10, datasets.NoisyCIFAR10, datasets.NoisyCIFAR3, datasets.CIFAR10N, datasets.CIFAR100, datasets.NoisyCIFAR100, datasets.CIFAR100N]:
-                    transform = nn.Sequential(
-                        transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
-                        )
-                else:
-                    transform = nn.Sequential(
-                        transforms_v2.Resize(256),
-                        transforms_v2.CenterCrop(224),
-                        transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
-                        )
+                match dataset_type:
+                    case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
+                        transform = nn.Sequential(
+                            transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+                            )
+                    case datasets.Clothing1M:
+                        transform = nn.Sequential(
+                            transforms_v2.Resize(256),
+                            transforms_v2.CenterCrop(224),
+                            transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
+                            )
+                    case _:
+                        raise NotImplementedError(dataset_type)
             case _:
                 raise NotImplementedError(op_name)
         match dataset_type: # image normalization parameters
