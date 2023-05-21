@@ -235,3 +235,13 @@ class LambdaLayer(nn.Module):
 
     def forward(self, x):
         return self.func(x)
+
+
+class Normalize2D(nn.Module):
+    def __init__(self, mean, std):
+        super().__init__()
+        self.register_buffer("mean", torch.tensor(mean).view(1, -1, 1, 1))
+        self.register_buffer("std", torch.tensor(std).view(1, -1, 1, 1))
+
+    def forward(self, x):
+        return x.sub_(self.mean).div_(self.std)

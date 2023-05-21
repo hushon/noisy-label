@@ -5,7 +5,8 @@ from .module import MCDropout, GaussianDropout, GaussianMCDropout, \
     MeanAbsoluteError, LambdaLayer, KLDivDistillationLoss, \
     L1DistillationLoss, SmoothL1DistillationLoss, \
     ReverseCrossEntropyLoss, SymmetricCrossEntropyLoss, \
-    GeneralizedCrossEntropyLoss, CrossEntropyDistillationLoss
+    GeneralizedCrossEntropyLoss, CrossEntropyDistillationLoss, \
+    Normalize2D
 import torchvision
 
 
