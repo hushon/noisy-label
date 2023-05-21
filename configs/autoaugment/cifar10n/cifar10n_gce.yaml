@@ -8,7 +8,7 @@ model:
 
 wandb:
   mode: online # "disabled" or "online"
-  entity: siit-iitp
+  entity: hyounguk-shon
   project: noisy-label
   name: CIFAR10N-GCE
   save_code: true
@@ -20,7 +20,7 @@ trainer:
   weight_decay: 1.0e-4
   lr_scheduler: multistep
   max_epoch: 200
-  num_workers: 8
+  num_workers: 2
   batch_size: 128
   save_model: true
   loss_fn: generalized_cross_entropy
@@ -28,3 +28,4 @@ trainer:
   enable_amp: false
   loss_param:
     q: 0.7
+  aug: autoaugment

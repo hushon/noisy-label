@@ -1,7 +1,7 @@
 data:
   dataset: noisy_cifar100
   noise_rate: 0.1
-  noise_type: symmetric
+  noise_type: asymmetric
   random_seed: 42
   download: true
 
@@ -13,7 +13,7 @@ wandb:
   mode: online # "disabled" or "online"
   entity: hyounguk-shon
   project: noisy-label
-  name: NoisyCIFAR100(symm,0.1)-CE
+  name: NoisyCIFAR100(asymm,0.1)-CE
   save_code: true
 
 trainer:
