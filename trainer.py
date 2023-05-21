@@ -9,7 +9,7 @@ from wandb.sdk.wandb_run import Run
 import pdb
 from models import MeanAbsoluteError, ReverseCrossEntropyLoss, SymmetricCrossEntropyLoss, \
     GeneralizedCrossEntropyLoss, CrossEntropyDistillationLoss
-from models import KLDivDistillationLoss, L1DistillationLoss, SmoothL1DistillationLoss
+from models import KLDivDistillationLoss, L1DistillationLoss, SmoothL1DistillationLoss, Normalize2D
 import torchvision
 torchvision.disable_beta_transforms_warning()
 from torchvision import transforms
@@ -125,12 +125,14 @@ class Trainer:
                         transform = nn.Sequential(
                             transforms_v2.RandomCrop(32, padding=4),
                             transforms_v2.RandomHorizontalFlip(),
+                            transforms_v2.ToImageTensor(),
                             )
                     case datasets.Clothing1M:
                         transform = nn.Sequential(
                             transforms.Resize(256),
                             transforms.RandomCrop(224),
                             transforms.RandomHorizontalFlip(),
+                            transforms_v2.ToImageTensor(),
                             )
                     case _:
                         raise NotImplementedError(dataset_type)
@@ -139,32 +141,37 @@ class Trainer:
                     case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
                         transform = nn.Sequential(
                             transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+                            transforms_v2.ToImageTensor(),
                             )
                     case datasets.Clothing1M:
                         transform = nn.Sequential(
                             transforms_v2.Resize(256),
                             transforms_v2.CenterCrop(224),
                             transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
+                            transforms_v2.ToImageTensor(),
                             )
                     case _:
                         raise NotImplementedError(dataset_type)
             case _:
                 raise NotImplementedError(op_name)
+        return transform
+
+    def get_normalization(self, dataset: Dataset):
+        dataset_type = type(dataset)
         match dataset_type: # image normalization parameters
             case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N:
-                normalize = transforms_v2.Normalize(*datasets.CIFAR10_MEAN_STD, inplace=True)
+                mean, std = datasets.CIFAR10_MEAN_STD
             case datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
-                normalize = transforms_v2.Normalize(*datasets.CIFAR100_MEAN_STD, inplace=True)
+                mean, std = datasets.CIFAR100_MEAN_STD
             case datasets.Clothing1M:
-                normalize = transforms_v2.Normalize(*datasets.IMAGENET_MEAN_STD, inplace=True)
+                mean, std = datasets.IMAGENET_MEAN_STD
             case _:
                 raise NotImplementedError(dataset_type)
-        transform = transform + nn.Sequential( # append ToTensor and normalization
-            transforms_v2.ToImageTensor(),
+        normalize = nn.Sequential( # append ToTensor and normalization
             transforms_v2.ConvertDtype(),
-            normalize,
+            Normalize2D(mean, std),
             )
-        return transform
+        return normalize
 
     def get_dataloader(self, dataset: Dataset, train=True) -> DataLoader:
         # return DataLoader(
@@ -184,7 +191,6 @@ class Trainer:
 
         self.model = torch.compile(self.model)
         # self.model = torch.jit.script(self.model)
-        dp_model = nn.DataParallel(self.model)
 
         optimizer = self.get_optimizer(self.model)
         lr_scheduler = self.get_lr_scheduler(optimizer)
@@ -193,6 +199,8 @@ class Trainer:
         artifact = wandb.Artifact(f'checkpoints',
                                   type='model',
                                   metadata=self.wandb_run.config['model'])
+
+        normalize = self.get_normalization(train_dataset).to(self.device)
 
         for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
             train_stats = {
@@ -203,9 +211,10 @@ class Trainer:
             self.model.train()
             for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
                 target = batch["target"].to(self.device)
-                data = batch["image"]
+                data = batch["image"].to(self.device)
+                data = normalize(data)
                 with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
-                    output = dp_model(data)
+                    output = self.model(data)
                     loss = self.criterion(output, target).mean()
                 optimizer.zero_grad()
                 grad_scaler.scale(loss).backward()
@@ -243,7 +252,6 @@ class Trainer:
 
         self.model = torch.compile(self.model)
         # self.model = torch.jit.script(self.model)
-        dp_model = nn.DataParallel(self.model)
 
         optimizer = self.get_optimizer(self.model)
         lr_scheduler = self.get_lr_scheduler(optimizer)
@@ -259,6 +267,8 @@ class Trainer:
                                             )
         alpha = self.config['alpha']
 
+        normalize = self.get_normalization(train_dataset).to(self.device)
+
         for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
             train_stats = {
                 "loss": [],
@@ -270,11 +280,13 @@ class Trainer:
             self.model.train()
             for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
                 target = batch["target"].to(self.device)
-                data, data2 = batch["image"], batch['image2']
+                data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
+                data = normalize(data)
+                data2 = normalize(data2)
                 with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
-                    output = dp_model(data)
+                    output = self.model(data)
                     with torch.no_grad():
-                        output_teacher = dp_model(data2)
+                        output_teacher = self.model(data2)
                     target_loss = self.criterion(output, target).mean()
                     distill_loss = distill_criterion(output, output_teacher).mean()
                     loss = target_loss * alpha + distill_loss * (1.0-alpha)
