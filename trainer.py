@@ -177,7 +177,7 @@ class Trainer:
         )
 
     def fit(self, train_dataset: Dataset, val_dataset: Dataset):
-        train_dataset.transform = self.get_transform('randomcrop', train_dataset)
+        train_dataset.transform = self.get_transform(self.config['aug'], train_dataset)
 
         train_dataloader = self.get_dataloader(train_dataset, train=True)
         val_dataloader = self.get_dataloader(val_dataset, train=False)

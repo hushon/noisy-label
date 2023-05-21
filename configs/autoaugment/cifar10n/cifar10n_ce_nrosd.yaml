@@ -1,0 +1,33 @@
+data:
+  dataset: cifar10n
+  noise_type: worse_label
+  download: true
+
+model:
+  architecture: resnet18
+  num_classes: 10
+
+wandb:
+  mode: online # "disabled" or "online"
+  entity: siit-iitp
+  project: noisy-label
+  name: CIFAR10N(worse_label)-NROSD-CE
+  save_code: true
+
+trainer:
+  optimizer: sgd
+  init_lr: 0.1
+  momentum: 0.9
+  weight_decay: 1.0e-4
+  lr_scheduler: multistep
+  max_epoch: 200
+  num_workers: 8
+  batch_size: 128
+  save_model: true
+  loss_fn: cross_entropy
+  alpha: 0.5
+  teacher_aug: autoaugment
+  student_aug: randomcrop
+  distill_loss_fn: kl_div
+  temperature: 1.0
+  enable_amp: false
