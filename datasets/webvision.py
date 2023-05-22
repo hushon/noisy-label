@@ -4,88 +4,88 @@ import numpy as np
 from typing import Tuple, Any
 from PIL import Image
 import os
+from simplejpeg import decode_jpeg
 
-# TODO: Imagenet..?
-class WebVision(torch.utils.data.Dataset):
+
+def image_loader(path: str) -> Image.Image:
+    try:
+        with open(path, 'rb') as fp:
+            image = decode_jpeg(fp.read(), colorspace='RGB')
+        image = Image.fromarray(image)
+    except:
+        image = Image.open(path).convert('RGB')
+        print(f'Resorting to PIL: {path}')
+    return image
+
+
+class WebVisionV1(torch.utils.data.Dataset):
+    """
+    Directory structure of official version.
+    In this implementation, we follow the official version but utilize only Google Images.
+    WebVision/
+    ├── info
+    │ ├── train_filelist_google.txt
+    │ ├── val_filelist.txt
+    │ ├── test_filelist.txt
+    │ ├── ⋮
+    │ └── ...
+    ├── google
+    │ ├── q0001
+    │ │ └── ******.jpg
+    │ ├── ⋮
+    │ └── q
+    ├── val_images
+    │ ├── val000001.jpg
+    │ ├── ⋮
+    │ └── val050000.jpg
+    └── test_images
+        ├── test000001.jpg
+        ├── ⋮
+        └── test050000.jpg
+    """
+    metafile = {
+        'train': 'train_filelist_google.txt',
+        'val': 'val_filelist.txt',
+        'test': 'test_filelist.txt',
+    }
+
     def __init__(
         self,
         root: str,
-        train: bool = True,
+        split: str = 'train',
+        num_classes: int = 50,
         transform = None,
+        transform2 = None,
         target_transform = None,
-        num_class: int= 0,
-        split: str = ''):
+        ):
         # Adapted from https://github.com/LiJunnan1992/DivideMix/blob/master/dataloader_webvision.py
         # 'all', and 'unlabeled' mode are deprecated. We only support 'train(with label)', 'test' and 'val'.
+        assert split in ['train', 'val', 'test']
+        assert 1 <= num_classes <= 1000
+
         self.root = root
-        self.transform = transform
-        self.target_transform = target_transform
         self.split = split
-        self.train = train
-        """
-            Directory structure of official version.
-            In this implementation, we follow the official version but utilize only Google Images.
-            WebVision/
-            ├── info
-            │ ├── train_filelist_google.txt
-            │ ├── val_filelist.txt
-            │ ├── test_filelist.txt
-            │ ├── ⋮
-            │ └── ...
-            ├── google
-            │ ├── q0001
-            │ │ └── ******.jpg
-            │ ├── ⋮
-            │ └── q
-            ├── val_images
-            │ ├── val000001.jpg
-            │ ├── ⋮
-            │ └── val050000.jpg
-            └── test_images
-              ├── test000001.jpg
-              ├── ⋮
-              └── test050000.jpg
-        """
-        # TODO: subset만 한다고 했을 때, 50 class sorting이 webvision train/test // imagenet train/test 다 동일한가..? metadata 열어보기.
-        finfo = None
-        if self.train:
-            finfo = 'train_filelist_google.txt'
-        else:
-            if split in ['', 'test']:
-                finfo = 'val_filelist.txt'
-            elif split == 'val':
-                finfo = 'test_filelist.txt'
-            else:
+        self.num_classes = num_classes
+        self.transform = transform
+        self.transform2 = transform2
+        self.target_transform = target_transform
+
+        info_file = os.path.join(self.root, 'webvision', 'info', self.metafile[self.split])
+        self.img_list, self.labels = self._get_filepath(info_file, self.num_classes)
+
+        match self.split:
+            case 'train':
+                self.base_path = os.path.join(self.root, 'webvision')
+            case 'val':
+                self.base_path = os.path.join(self.root, 'webvision', 'val_images_256')
+            case 'test':
+                self.base_path = os.path.join(self.root, 'webvision', 'test_images_256')
+            case _:
                 raise NotImplementedError
 
-        # TODO: self.root naming convention across datasets.
-        info_file = os.path.join(self.root, 'info', finfo)
-
-        self.img_list, self.labels = self.get_filepath(info_file, num_class)
-
-    def __len__(self):
-            return len(self.img_list)
-
-    def __getitem__(self, index):
-        img_path = self.img_list[index]
-        image = Image.open(os.path.join(self.root, img_path)).convert('RGB')
-
-        target = self.labels[img_path]
-        target = torch.tensor(target)
-
-        if self.transform is not None:
-            image = self.transform(image)
-
-        if self.target_transform is not None:
-            target = self.target_transform(target)
-
-        return {
-            'image': image,
-            'target': target
-        } # No target_gt: real-world noisy dataset.
-
     @staticmethod
-    def get_filepath(info_file, num_class):
+    def _get_filepath(info_file, num_class):
+        # TODO: subset만 한다고 했을 때, 50 class sorting이 webvision train/test // imagenet train/test 다 동일한가..? metadata 열어보기.
         with open(info_file) as f:
             lines=f.readlines()
         img_list = []
@@ -98,15 +98,28 @@ class WebVision(torch.utils.data.Dataset):
                 labels[img]=target
         return img_list, labels
 
-if __name__ == '__main__':
-    import pdb
-    root = './data/WebVision/google_low_resolution'
-    dset = WebVision(root, train=True)
-    pdb.set_trace()
+    def __len__(self):
+            return len(self.img_list)
 
+    def __getitem__(self, index):
+        img_path = self.img_list[index]
+        image = image_loader(os.path.join(self.base_path, img_path))
 
-# TODO: Or, inherit from torchvision imagenet dataset?
-class ImageNetVal(torch.utils.data.Dataset):
-    #This class is for validating webvision model.
-    
-    pass
+        target = self.labels[img_path]
+        target = torch.tensor(target)
+
+        if self.transform is not None:
+            image1 = self.transform(image)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        output = {
+            'image': image1,
+            'target': target,
+        }# No target_gt: real-world noisy dataset. # TODO: clean key_list..?
+        if self.transform2 is not None:
+            output.update({
+                'image2': self.transform2(image),
+            })
+        return output

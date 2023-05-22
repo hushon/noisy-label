@@ -25,3 +25,4 @@ trainer:
   save_model: true
   loss_fn: mae
   enable_amp: false
+  aug: autoaugment

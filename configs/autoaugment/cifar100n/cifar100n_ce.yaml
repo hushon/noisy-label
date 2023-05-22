@@ -8,7 +8,7 @@ model:
 
 wandb:
   mode: online # "disabled" or "online"
-  entity: siit-iitp
+  entity: hyounguk-shon
   project: noisy-label
   name: CIFAR100N-CE
   save_code: true
@@ -26,3 +26,4 @@ trainer:
   loss_fn: cross_entropy
   alpha: 0.5
   enable_amp: false
+  aug: autoaugment

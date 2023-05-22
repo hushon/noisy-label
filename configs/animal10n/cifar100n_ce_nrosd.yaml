@@ -1,16 +1,16 @@
 data:
-  dataset: animal10n
+  dataset: cifar100n
   download: true
 
 model:
   architecture: resnet18
-  num_classes: 10
+  num_classes: 100
 
 wandb:
   mode: online # "disabled" or "online"
   entity: siit-iitp
   project: noisy-label
-  name: CIFAR100N-CE
+  name: CIFAR100N-NROSD-CE
   save_code: true
 
 trainer:
@@ -25,4 +25,8 @@ trainer:
   save_model: true
   loss_fn: cross_entropy
   alpha: 0.5
+  teacher_aug: autoaugment
+  student_aug: randomcrop
+  distill_loss_fn: kl_div
+  temperature: 1.0
   enable_amp: false

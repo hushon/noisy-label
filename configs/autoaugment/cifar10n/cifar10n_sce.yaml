@@ -1,5 +1,5 @@
 data:
-  dataset: animal10n
+  dataset: cifar10n
   download: true
 
 model:
@@ -8,9 +8,9 @@ model:
 
 wandb:
   mode: online # "disabled" or "online"
-  entity: siit-iitp
+  entity: hyounguk-shon
   project: noisy-label
-  name: CIFAR100N-CE
+  name: CIFAR10N-SCE
   save_code: true
 
 trainer:
@@ -20,9 +20,13 @@ trainer:
   weight_decay: 1.0e-4
   lr_scheduler: multistep
   max_epoch: 200
-  num_workers: 8
+  num_workers: 2
   batch_size: 128
   save_model: true
-  loss_fn: cross_entropy
+  loss_fn: symmetric_cross_entropy
+  loss_param:
+    alpha: 0.1
+    beta: 1.0
   alpha: 0.5
   enable_amp: false
+  aug: autoaugment

@@ -1,31 +1,29 @@
 data:
-  dataset: cifar100n
-  download: true
+  dataset: webvision
 
 model:
-  architecture: resnet18
-  num_classes: 100
+  architecture: resnet50_torchvision
+  num_classes: 50
+  pretrained: true
 
 wandb:
   mode: online # "disabled" or "online"
   entity: hyounguk-shon
   project: noisy-label
-  name: CIFAR100N-GCE
+  name: WebVision-GCE
   save_code: true
 
 trainer:
+  enable_amp: true
   optimizer: sgd
-  init_lr: 0.1
+  init_lr: 0.001
   momentum: 0.9
   weight_decay: 1.0e-4
-  lr_scheduler: multistep
-  max_epoch: 200
-  num_workers: 8
+  lr_scheduler: cosine
+  max_epoch: 40
+  num_workers: 10
   batch_size: 128
   save_model: true
   loss_fn: generalized_cross_entropy
-  alpha: 0.5
-  enable_amp: false
   loss_param:
     q: 0.7
-  aug: autoaugment

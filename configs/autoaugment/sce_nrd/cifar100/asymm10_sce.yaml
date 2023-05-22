@@ -1,5 +1,8 @@
 data:
-  dataset: cifar100n
+  dataset: noisy_cifar100
+  noise_rate: 0.1
+  noise_type: asymmetric
+  random_seed: 42
   download: true
 
 model:
@@ -10,25 +13,26 @@ wandb:
   mode: online # "disabled" or "online"
   entity: hyounguk-shon
   project: noisy-label
-  name: CIFAR100N-GCE-NRD
+  name: NoisyCIFAR100(asymm,0.1)-SCE-NRD
   save_code: true
 
 trainer:
   optimizer: sgd
-  init_lr: 0.1
+  init_lr: 1.0e-1
   momentum: 0.9
   weight_decay: 1.0e-4
   lr_scheduler: multistep
   max_epoch: 200
-  num_workers: 8
+  loss_fn: symmetric_cross_entropy
+  num_workers: 2
   batch_size: 128
   save_model: true
-  loss_fn: generalized_cross_entropy
-  alpha: 0.5
+  enable_amp: false
   teacher_aug: randomcrop
   student_aug: autoaugment
+  loss_param:
+    alpha: 6.0
+    beta: 0.1
   distill_loss_fn: smoothed_l1_dist
   temperature: 1.0
-  enable_amp: false
-  loss_param:
-    q: 0.7
+  alpha: 0.5

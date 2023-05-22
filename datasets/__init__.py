@@ -2,6 +2,7 @@ from .cifar import CIFAR10, CIFAR100, NoisyCIFAR10, NoisyCIFAR100, CIFAR10N, CIF
 from .food101 import Food101
 from .animal import Animal10N
 from .clothing import Clothing1M
+from .webvision import WebVisionV1
 import torchvision
 torchvision.disable_beta_transforms_warning()
 
@@ -9,6 +10,8 @@ from torchvision import transforms
 import torchvision.transforms.v2 as transforms_v2
 from typing import Tuple
 from torch.utils.data import Dataset, DataLoader
+import torch
+from torch import nn
 
 
 CIFAR10_MEAN_STD = ((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
@@ -78,6 +81,7 @@ def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
             ])
             train_dataset = Clothing1M(data_root, split='noisy_train', transform=transform_train, **kwargs)
             test_dataset = Clothing1M(data_root, split='clean_test', transform=transform_test, **kwargs)
+
         case "cifar10n":
             transform_train = transforms.Compose([
                 transforms_v2.RandomCrop(32, padding=[4,]),
@@ -91,6 +95,7 @@ def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
             ])
             train_dataset = CIFAR10N(data_root, transform=transform_train, **kwargs)
             test_dataset = CIFAR10(data_root, train=False, transform=transform_test)
+
         case "cifar100n":
             transform_train = transforms.Compose([
                 transforms_v2.RandomCrop(32, padding=[4,]),
@@ -104,6 +109,7 @@ def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
             ])
             train_dataset = CIFAR100N(data_root, transform=transform_train, **kwargs)
             test_dataset = CIFAR100(data_root, train=False, transform=transform_test)
+
         case "animal10n":
             transform_train = transforms.Compose([
                 transforms.RandomCrop(64, padding=4),
@@ -115,6 +121,9 @@ def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
                 transforms.ToTensor(),
                 transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
             ])
+            train_dataset = Animal10N(data_root, train=True, transform=transform_train, **kwargs)
+            test_dataset = Animal10N(data_root, train=False, transform=transform_test)
+
         case "webvision":
             transform_train = transforms.Compose([ # dividemix style
                 transforms.Resize(320),
@@ -150,18 +159,20 @@ def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
             #     transforms.RandomHorizontalFlip(),
             #     transforms.ToTensor(),
             #     transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
-            # ]) 
+            # ])
             # transform_test = transforms.Compose([
             #     transforms.CenterCrop(227),
             #     transforms.ToTensor(),
             #     transforms.Normalize((0.485, 0.456, 0.406),(0.229, 0.224, 0.225)),
-            # ])  
+            # ])
             # transform_imagenet = transforms.Compose([
             #     transforms.Resize(256),
             #     transforms.CenterCrop(227),
             #     transforms.ToTensor(),
             #     transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
             # ])
+            train_dataset = WebVisionV1(data_root, split='train', transform=transform_train, **kwargs)
+            test_dataset = WebVisionV1(data_root, split='val', transform=transform_test)
 
         case _:
             raise NotImplementedError

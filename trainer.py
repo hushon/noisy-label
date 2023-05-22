@@ -127,7 +127,7 @@ class Trainer:
                             transforms_v2.RandomHorizontalFlip(),
                             transforms_v2.ToImageTensor(),
                             )
-                    case datasets.Clothing1M:
+                    case datasets.Clothing1M | datasets.WebVisionV1:
                         transform = nn.Sequential(
                             transforms.Resize(256),
                             transforms.RandomCrop(224),
@@ -143,7 +143,7 @@ class Trainer:
                             transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
                             transforms_v2.ToImageTensor(),
                             )
-                    case datasets.Clothing1M:
+                    case datasets.Clothing1M | datasets.WebVisionV1:
                         transform = nn.Sequential(
                             transforms_v2.Resize(256),
                             transforms_v2.CenterCrop(224),
@@ -163,7 +163,7 @@ class Trainer:
                 mean, std = datasets.CIFAR10_MEAN_STD
             case datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
                 mean, std = datasets.CIFAR100_MEAN_STD
-            case datasets.Clothing1M:
+            case datasets.Clothing1M | datasets.WebVisionV1:
                 mean, std = datasets.IMAGENET_MEAN_STD
             case _:
                 raise NotImplementedError(dataset_type)
