@@ -1,10 +1,12 @@
+method: nrd
+
 data:
   dataset: webvision
 
 model:
   architecture: resnet50_torchvision
   num_classes: 50
-  pretrained: true
+  pretrained: false
 
 wandb:
   mode: online # "disabled" or "online"
@@ -16,11 +18,11 @@ wandb:
 trainer:
   enable_amp: true
   optimizer: sgd
-  init_lr: 0.001
+  init_lr: 0.1
   momentum: 0.9
   weight_decay: 1.0e-4
   lr_scheduler: cosine
-  max_epoch: 40
+  max_epoch: 120
   num_workers: 16
   batch_size: 128
   save_model: true

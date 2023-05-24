@@ -125,35 +125,35 @@ def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
             test_dataset = Animal10N(data_root, train=False, transform=transform_test)
 
         case "webvision":
-            transform_train = transforms.Compose([ # dividemix style
-                transforms.Resize(320),
-                transforms.RandomResizedCrop(299),
-                transforms.RandomHorizontalFlip(),
-                transforms.ToTensor(),
-                transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
-                ])
-            transform_test = transforms.Compose([
-                transforms.Resize(320),
-                transforms.CenterCrop(299),
-                transforms.ToTensor(),
-                transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
-                ])
-            # transform_train = transforms.Compose([ # normalized loss style
-            #     transforms.RandomResizedCrop(224),
+            # transform_train = transforms.Compose([ # dividemix style
+            #     transforms.Resize(320),
+            #     transforms.RandomResizedCrop(299),
             #     transforms.RandomHorizontalFlip(),
-            #     transforms.ColorJitter(brightness=0.4,
-            #                             contrast=0.4,
-            #                             saturation=0.4,
-            #                             hue=0.2),
             #     transforms.ToTensor(),
             #     transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
             #     ])
             # transform_test = transforms.Compose([
-            #     transforms.Resize(256),
-            #     transforms.CenterCrop(224),
+            #     transforms.Resize(320),
+            #     transforms.CenterCrop(299),
             #     transforms.ToTensor(),
             #     transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
             #     ])
+            transform_train = transforms.Compose([ # normalized loss style
+                transforms.RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                transforms.ColorJitter(brightness=0.4,
+                                        contrast=0.4,
+                                        saturation=0.4,
+                                        hue=0.2),
+                transforms.ToTensor(),
+                transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
+                ])
+            transform_test = transforms.Compose([
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
+                ])
             # transform_train = transforms.Compose([ # ELR style
             #     transforms.RandomCrop(227),
             #     transforms.RandomHorizontalFlip(),
@@ -175,7 +175,7 @@ def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
             test_dataset = WebVisionV1(data_root, split='val', transform=transform_test)
 
         case _:
-            raise NotImplementedError
+            raise NotImplementedError(dataset_name)
 
     return train_dataset, test_dataset
 

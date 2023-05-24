@@ -14,8 +14,8 @@ from datasets import get_dataset
 from models import get_model
 
 
-np.random.seed(0)
-torch.manual_seed(42)
+# np.random.seed(0)
+# torch.manual_seed(42)
 torch.backends.cudnn.deterministic = False
 torch.backends.cudnn.benchmark = True
 
@@ -35,6 +35,9 @@ def main():
         config = yaml.safe_load(file)
     pprint.pprint(config)
 
+    if os.environ.get('DRYRUN', '0') == '1':
+        config['wandb']['mode'] = 'disabled'
+
     wandb_run = wandb.init(
         **config['wandb'],
         config=config,
@@ -42,17 +45,26 @@ def main():
     wandb_run.save(args.config)
     wandb_run.log_code()
 
-    train_dataset, test_dataset = get_dataset(**config["data"])
 
     model = get_model(**config["model"])
-
     trainer = Trainer(
                     model=model,
                     config=config['trainer'],
                     wandb_run=wandb_run,
                     )
 
-    trainer.fit(train_dataset, test_dataset)
+    train_dataset, test_dataset = get_dataset(**config["data"])
+
+
+    match config['method']:
+        case 'vanilla':
+            trainer.fit(train_dataset, test_dataset)
+        case 'nrd':
+            trainer.fit_nrosd(train_dataset, test_dataset)
+        case 'nrd_hardlabel':
+            trainer.fit_nrosd_hardlabel(train_dataset, test_dataset)
+        case _:
+            raise NotImplementedError
 
 
     # wandb_run.alert(
