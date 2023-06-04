@@ -20,28 +20,34 @@ def image_loader(path: str) -> Image.Image:
 
 class WebVisionV1(torch.utils.data.Dataset):
     """
+    Li, Wen, et al. "Webvision database: Visual learning and understanding
+    from web data." arXiv preprint arXiv:1708.02862 (2017).
+
+    We utilize only Google Images following Chen, Pengfei, et al.
+    "Understanding and utilizing deep neural networks trained with noisy
+    labels." International Conference on Machine Learning. PMLR, 2019.
+
     Directory structure of official version.
-    In this implementation, we follow the official version but utilize only Google Images.
-    WebVision/
-    ├── info
-    │ ├── train_filelist_google.txt
-    │ ├── val_filelist.txt
-    │ ├── test_filelist.txt
-    │ ├── ⋮
-    │ └── ...
-    ├── google
-    │ ├── q0001
-    │ │ └── ******.jpg
-    │ ├── ⋮
-    │ └── q
-    ├── val_images
-    │ ├── val000001.jpg
-    │ ├── ⋮
-    │ └── val050000.jpg
-    └── test_images
-        ├── test000001.jpg
-        ├── ⋮
-        └── test050000.jpg
+        WebVision/
+        ├── info
+        │ ├── train_filelist_google.txt
+        │ ├── val_filelist.txt
+        │ ├── test_filelist.txt
+        │ ├── ⋮
+        │ └── ...
+        ├── google
+        │ ├── q0001
+        │ │ └── ******.jpg
+        │ ├── ⋮
+        │ └── q
+        ├── val_images
+        │ ├── val000001.jpg
+        │ ├── ⋮
+        │ └── val050000.jpg
+        └── test_images
+            ├── test000001.jpg
+            ├── ⋮
+            └── test050000.jpg
     """
     metafile = {
         'train': 'train_filelist_google.txt',
