@@ -74,8 +74,8 @@ def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
                 transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
             ])
             transform_test = transforms.Compose([
-                transforms.Resize(256),
-                transforms.CenterCrop(224),
+                transforms_v2.Resize(256),
+                transforms_v2.CenterCrop(224),
                 transforms.ToTensor(),
                 transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
             ])
@@ -173,6 +173,32 @@ def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
             # ])
             train_dataset = WebVisionV1(data_root, split='train', transform=transform_train, **kwargs)
             test_dataset = WebVisionV1(data_root, split='val', transform=transform_test)
+        case "cifar10":
+            transform_train = transforms.Compose([
+                transforms_v2.RandomCrop(32, padding=[4,]),
+                transforms_v2.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+            ])
+            transform_test = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+            ])
+            train_dataset = CIFAR10(data_root, transform=transform_train, **kwargs)
+            test_dataset = CIFAR10(data_root, train=False, transform=transform_test)
+        case "cifar100":
+            transform_train = transforms.Compose([
+                transforms_v2.RandomCrop(32, padding=[4,]),
+                transforms_v2.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+            ])
+            transform_test = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+            ])
+            train_dataset = CIFAR100(data_root, transform=transform_train, **kwargs)
+            test_dataset = CIFAR100(data_root, train=False, transform=transform_test)
 
         case _:
             raise NotImplementedError(dataset_name)
