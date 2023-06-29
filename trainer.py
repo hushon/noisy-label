@@ -182,6 +182,46 @@ class Trainer:
                             )
                     case _:
                         raise NotImplementedError(dataset_type)
+            case "gaussianblur":
+                match dataset_type:
+                    case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
+                        transform = nn.Sequential(
+                            transforms_v2.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0)),
+                            transforms_v2.RandomHorizontalFlip(),
+                            transforms_v2.ToImageTensor(),
+                            )
+                    case _:
+                        raise NotImplementedError(dataset_type)
+            case "sharpen":
+                match dataset_type:
+                    case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
+                        transform = nn.Sequential(
+                            transforms_v2.RandomAdjustSharpness(sharpness_factor=2.0, p=0.5),
+                            transforms_v2.RandomHorizontalFlip(),
+                            transforms_v2.ToImageTensor(),
+                            )
+                    case _:
+                        raise NotImplementedError(dataset_type)
+            case "rotate":
+                match dataset_type:
+                    case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
+                        transform = nn.Sequential(
+                            transforms_v2.RandomRotation(degrees=15),
+                            transforms_v2.RandomHorizontalFlip(),
+                            transforms_v2.ToImageTensor(),
+                            )
+                    case _:
+                        raise NotImplementedError(dataset_type)
+            case "colorjitter":
+                match dataset_type:
+                    case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
+                        transform = nn.Sequential(
+                            transforms_v2.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
+                            transforms_v2.RandomHorizontalFlip(),
+                            transforms_v2.ToImageTensor(),
+                            )
+                    case _:
+                        raise NotImplementedError(dataset_type)
             case _:
                 raise NotImplementedError(op_name)
         return transform
