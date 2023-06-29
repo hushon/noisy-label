@@ -229,7 +229,8 @@ class Trainer:
                 raise NotImplementedError(op_name)
         return transform
 
-    def get_normalization(self, dataset: Dataset):
+    @staticmethod
+    def get_normalization(dataset: Dataset):
         dataset_type = type(dataset)
         match dataset_type: # image normalization parameters
             case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N:
@@ -962,6 +963,7 @@ class AverageMeter:
         self.cnt = 0
         self.stats = defaultdict(int)
 
+    @torch.no_grad()
     def update(self, size: int, **kwargs):
         """
         size: batch size
