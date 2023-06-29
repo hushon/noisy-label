@@ -12,6 +12,8 @@ import pprint
 from torchvision import transforms
 from datasets import get_dataset
 from models import get_model
+# import multiprocessing
+import torch.multiprocessing as multiprocessing
 
 
 # np.random.seed(0)
@@ -42,12 +44,21 @@ def main(config):
     wandb_run.save(args.config)
     wandb_run.log_code()
 
+    # for multiprocessing
+    if multiprocessing.current_process().name == 'MainProcess':
+        device = "cuda:0"
+    else:
+        worker_id = multiprocessing.current_process().name
+        print(f"{worker_id=}")
+        worker_id = int(worker_id.split('-')[1]) - 1
+        device = f"cuda:{worker_id}"
 
     model = get_model(**config["model"])
     trainer = Trainer(
                     model=model,
                     config=config['trainer'],
                     wandb_run=wandb_run,
+                    device=device,
                     )
 
     train_dataset, test_dataset = get_dataset(**config["data"])
@@ -150,6 +161,20 @@ if __name__ == '__main__':
     #         config['trainer']['teacher_aug'] = teacher_aug
     #         config['trainer']['student_aug'] = student_aug
     #         main(config)
-    for aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
-        config['trainer']['aug'] = aug
-        main(config)
+
+    # for aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
+    #     config['trainer']['aug'] = aug
+    #     main(config)
+
+
+    from concurrent.futures import ProcessPoolExecutor
+    from copy import deepcopy
+
+    # run a list of configs in parallel
+    with ProcessPoolExecutor(max_workers=2) as pool:
+        for aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
+            config['trainer']['aug'] = aug
+            pool.submit(main, deepcopy(config))
+        pool.shutdown(wait=True)
+
+
