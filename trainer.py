@@ -962,37 +962,6 @@ def calculate_accuracy(pred: torch.Tensor, target: torch.Tensor, k=1):
     return accuracy
 
 
-# class AverageMeter:
-#     def __init__(self):
-#         self.item_cnt = []
-#         self.stats = defaultdict(list)
-
-#     def update(self, size, **kwargs):
-#         self.item_cnt.append(size)
-#         for key, value in kwargs.items():
-#             self.stats[key].append(value)
-
-#     def get_average(self) -> dict:
-#         return {key: sum(n*v for n, v in zip(self.item_cnt, value)) / sum(self.item_cnt) for key, value in self.stats.items()}
-
-#     def get_list(self) -> dict:
-#         return {key: value for key, value in self.stats.items()}
-
-
-# class AverageMeter:
-#     def __init__(self):
-#         self.item_cnt = 0
-#         self.stats = defaultdict(int)
-
-#     def update(self, size, **kwargs):
-#         for key, value in kwargs.items():
-#             self.stats[key] += size*value
-#         self.item_cnt += size
-
-#     def get_average(self) -> dict:
-#         return {key: value / self.item_cnt for key, value in self.stats.items()}
-
-
 class AverageMeter:
     def __init__(self):
         self.cnt = 0
