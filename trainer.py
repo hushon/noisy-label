@@ -16,13 +16,14 @@ from torchvision import transforms
 import torchvision.transforms.v2 as transforms_v2
 import numpy as np
 import datasets
+from collections import defaultdict
 
 
 class Trainer:
     def __init__(self, model: nn.Module, config: dict, wandb_run: Run=None, device='cuda:0'):
         self.device = torch.device(device)
         self.model = model
-        if os.environ.get('DRYRUN', '0') == '1':
+        if os.environ.get('COMPILE', '0') == '1':
             pass
         else:
             self.model = torch.compile(self.model)
@@ -32,9 +33,10 @@ class Trainer:
         self.wandb_run = wandb_run
         self.criterion = self.get_loss_fn(self.config["loss_fn"]).to(self.device)
 
-    def get_optimizer(self,
-                      model: nn.Module
-                      ) -> torch.optim.Optimizer:
+    def get_optimizer(
+            self,
+            model: nn.Module
+        ) -> torch.optim.Optimizer:
         match self.config["optimizer"]:
             case "sgd":
                 optimizer = torch.optim.SGD(
@@ -53,9 +55,10 @@ class Trainer:
                 raise NotImplementedError(self.config["optimizer"])
         return optimizer
 
-    def get_lr_scheduler(self,
-                         optimizer: torch.optim.Optimizer
-                         ) -> torch.optim.lr_scheduler.LRScheduler:
+    def get_lr_scheduler(
+            self,
+            optimizer: torch.optim.Optimizer
+        ) -> torch.optim.lr_scheduler.LRScheduler:
         match self.config["lr_scheduler"]:
             case "cosine":
                 lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
@@ -237,11 +240,10 @@ class Trainer:
                 mean, std = datasets.IMAGENET_MEAN_STD
             case _:
                 raise NotImplementedError(dataset_type)
-        normalize = nn.Sequential( # append ToTensor and normalization
+        return nn.Sequential(
             transforms_v2.ConvertDtype(),
             Normalize2D(mean, std),
-            )
-        return normalize
+        )
 
     def get_dataloader(self, dataset: Dataset, train=True) -> DataLoader:
         # return DataLoader(
@@ -270,11 +272,7 @@ class Trainer:
         normalize = self.get_normalization(train_dataset).to(self.device)
 
         for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
-            train_stats = {
-                "loss": [],
-                "t1acc": [],
-                "t5acc": [],
-            }
+            train_stats = AverageMeter()
             self.model.train()
             for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
                 target = batch["target"].to(self.device)
@@ -287,13 +285,15 @@ class Trainer:
                 grad_scaler.scale(loss).backward()
                 grad_scaler.step(optimizer)
                 grad_scaler.update()
-                train_stats["loss"].append(loss.detach())
-                train_stats["t1acc"].append(calculate_accuracy(output, target))
-                train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
+                train_stats.update(
+                    target.size(0),
+                    loss=loss.detach(),
+                    t1acc=calculate_accuracy(output, target),
+                    t5acc=calculate_accuracy(output, target, k=5),
+                )
+
             lr_scheduler.step()
-            train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
-            train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
-            train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
+            train_stats = train_stats.get_average()
 
             val_stats = self._evaluate(val_dataloader)
             tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
@@ -334,13 +334,7 @@ class Trainer:
         normalize = self.get_normalization(train_dataset).to(self.device)
 
         for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
-            train_stats = {
-                "loss": [],
-                "t1acc": [],
-                "t5acc": [],
-                "target_loss": [],
-                "distill_loss": [],
-            }
+            train_stats = AverageMeter()
             self.model.train()
             for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
                 target = batch["target"].to(self.device)
@@ -358,18 +352,17 @@ class Trainer:
                 grad_scaler.scale(loss).backward()
                 grad_scaler.step(optimizer)
                 grad_scaler.update()
-                train_stats["loss"].append(loss.detach())
-                train_stats["t1acc"].append(calculate_accuracy(output, target))
-                train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
-                train_stats["target_loss"].append(target_loss.detach())
-                train_stats["distill_loss"].append(distill_loss.detach())
+                train_stats.update(
+                    target.size(0),
+                    loss=loss.detach(),
+                    t1acc=calculate_accuracy(output, target),
+                    t5acc=calculate_accuracy(output, target, k=5),
+                    target_loss=target_loss.detach(),
+                    distill_loss=distill_loss.detach()
+                )
             lr_scheduler.step()
-            train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
-            train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
-            train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
-            train_stats["target_loss"] = torch.stack(train_stats["target_loss"]).mean().item()
-            train_stats["distill_loss"] = torch.stack(train_stats["distill_loss"]).mean().item()
 
+            train_stats = train_stats.get_average()
             val_stats = self._evaluate(val_dataloader)
             tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
             self.wandb_run.log(
@@ -604,7 +597,6 @@ class Trainer:
                 filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
                 torch.save(self.model.state_dict(), filepath)
                 self.wandb_run.save(filepath)
-
 
     @torch.no_grad()
     def _evaluate(self, dataloader: DataLoader) -> dict:
@@ -968,3 +960,50 @@ def calculate_accuracy(pred: torch.Tensor, target: torch.Tensor, k=1):
     correct = pred.eq(target[..., None].expand_as(pred)).any(dim=-1)
     accuracy = correct.float().mean().mul(100.0)
     return accuracy
+
+
+# class AverageMeter:
+#     def __init__(self):
+#         self.item_cnt = []
+#         self.stats = defaultdict(list)
+
+#     def update(self, size, **kwargs):
+#         self.item_cnt.append(size)
+#         for key, value in kwargs.items():
+#             self.stats[key].append(value)
+
+#     def get_average(self) -> dict:
+#         return {key: sum(n*v for n, v in zip(self.item_cnt, value)) / sum(self.item_cnt) for key, value in self.stats.items()}
+
+#     def get_list(self) -> dict:
+#         return {key: value for key, value in self.stats.items()}
+
+
+# class AverageMeter:
+#     def __init__(self):
+#         self.item_cnt = 0
+#         self.stats = defaultdict(int)
+
+#     def update(self, size, **kwargs):
+#         for key, value in kwargs.items():
+#             self.stats[key] += size*value
+#         self.item_cnt += size
+
+#     def get_average(self) -> dict:
+#         return {key: value / self.item_cnt for key, value in self.stats.items()}
+
+
+class AverageMeter:
+    def __init__(self):
+        self.cnt = 0
+        self.stats = defaultdict(int)
+
+    def update(self, size, **kwargs):
+        a = self.cnt / (self.cnt + size)
+        b = size / (self.cnt + size)
+        for key, value in kwargs.items():
+            self.stats[key] = a*self.stats[key] + b*value
+        self.cnt += size
+
+    def get_average(self) -> dict:
+        return self.stats
