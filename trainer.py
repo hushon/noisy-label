@@ -601,24 +601,19 @@ class Trainer:
     @torch.no_grad()
     def _evaluate(self, dataloader: DataLoader) -> dict:
         self.model.eval()
-        stats = {
-            "loss": [],
-            "t1acc": [],
-            "t5acc": [],
-        }
-        total_size = 0
+        stats = AverageMeter()
         for batch in dataloader:
             data, target = batch["image"].to(self.device), batch["target"].to(self.device)
-            total_size += data.size(0)
             with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
                 output = self.model(data).float()
                 loss = self.criterion(output, target).mean()
-            stats["loss"].append(loss.detach()*data.size(0))
-            stats["t1acc"].append(calculate_accuracy(output, target)*data.size(0))
-            stats["t5acc"].append(calculate_accuracy(output, target, k=5)*data.size(0))
-        stats["loss"] = torch.tensor(stats["loss"]).sum().div(total_size).item()
-        stats["t1acc"] = torch.tensor(stats["t1acc"]).sum().div(total_size).item()
-        stats["t5acc"] = torch.tensor(stats["t5acc"]).sum().div(total_size).item()
+            stats.update(
+                data.size(0),
+                loss=loss.detach(),
+                t1acc=calculate_accuracy(output, target),
+                t5acc=calculate_accuracy(output, target, k=5),
+            )
+        stats = stats.get_average()
         return stats
 
     @torch.no_grad()
