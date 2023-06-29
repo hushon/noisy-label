@@ -962,7 +962,11 @@ class AverageMeter:
         self.cnt = 0
         self.stats = defaultdict(int)
 
-    def update(self, size, **kwargs):
+    def update(self, size: int, **kwargs):
+        """
+        size: batch size
+        kwargs: key-value pairs of stats to update
+        """
         a = self.cnt / (self.cnt + size)
         b = size / (self.cnt + size)
         for key, value in kwargs.items():
