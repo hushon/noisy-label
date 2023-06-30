@@ -1,0 +1,38 @@
+method: nrd_hardlabel
+
+data:
+  dataset: noisy_cifar10
+  noise_type: symmetric
+  noise_rate: 0.5
+  download: true
+
+model:
+  architecture: resnet18
+  num_classes: 10
+
+wandb:
+  mode: online # "disabled" or "online"
+  entity: hyounguk-shon
+  project: noisy-label
+  name: CIFAR10(symm,0.5)-GCE-NRD-hardlabel
+  save_code: true
+
+trainer:
+  optimizer: sgd
+  init_lr: 0.1
+  momentum: 0.9
+  weight_decay: 1.0e-4
+  lr_scheduler: multistep
+  max_epoch: 200
+  num_workers: 8
+  batch_size: 128
+  save_model: true
+  loss_fn: generalized_cross_entropy
+  alpha: 0.5
+  teacher_aug: autoaugment
+  student_aug: randomcrop
+  distill_loss_fn: smoothed_l1_dist
+  temperature: 1.0
+  enable_amp: false
+  loss_param:
+    q: 0.7

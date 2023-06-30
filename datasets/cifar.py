@@ -18,21 +18,72 @@ class Categorical(torch.distributions.Categorical):
 
 
 class CIFAR10(torchvision.datasets.CIFAR10):
-    def __getitem__(self, index: int):
-        img, target = super().__getitem__(index)
-        return {
-            "image": img,
-            "target": target,
+    def __init__(
+        self,
+        root: str,
+        train: bool = True,
+        transform = None,
+        transform2 = None,
+        target_transform = None,
+        download: bool = False,
+    ) -> None:
+        super().__init__(root, train, transform, target_transform, download)
+        self.transform2 = transform2
+
+    def __getitem__(self, index):
+        img, target = self.data[index], self.targets[index]
+        img = Image.fromarray(img)
+
+        if self.transform is not None:
+            img1 = self.transform(img)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        output = {
+            'image': img1,
+            'target': target,
         }
+        if self.transform2 is not None:
+            output.update({
+                'image2': self.transform2(img),
+            })
+        return output
+
 
 
 class CIFAR100(torchvision.datasets.CIFAR100):
-    def __getitem__(self, index: int):
-        img, target = super().__getitem__(index)
-        return {
-            "image": img,
-            "target": target,
+    def __init__(
+        self,
+        root: str,
+        train: bool = True,
+        transform = None,
+        transform2 = None,
+        target_transform = None,
+        download: bool = False,
+    ) -> None:
+        super().__init__(root, train, transform, target_transform, download)
+        self.transform2 = transform2
+
+    def __getitem__(self, index):
+        img, target = self.data[index], self.targets[index]
+        img = Image.fromarray(img)
+
+        if self.transform is not None:
+            img1 = self.transform(img)
+
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        output = {
+            'image': img1,
+            'target': target,
         }
+        if self.transform2 is not None:
+            output.update({
+                'image2': self.transform2(img),
+            })
+        return output
 
 
 # class NoisyCIFAR10(torchvision.datasets.CIFAR10):

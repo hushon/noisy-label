@@ -2,13 +2,16 @@ from .cifar import CIFAR10, CIFAR100, NoisyCIFAR10, NoisyCIFAR100, CIFAR10N, CIF
 from .food101 import Food101
 from .animal import Animal10N
 from .clothing import Clothing1M
+from .webvision import WebVisionV1
 import torchvision
 torchvision.disable_beta_transforms_warning()
 
 from torchvision import transforms
 import torchvision.transforms.v2 as transforms_v2
 from typing import Tuple
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
+import torch
+from torch import nn
 
 
 CIFAR10_MEAN_STD = ((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
@@ -71,13 +74,14 @@ def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
                 transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
             ])
             transform_test = transforms.Compose([
-                transforms.Resize(256),
-                transforms.CenterCrop(224),
+                transforms_v2.Resize(256),
+                transforms_v2.CenterCrop(224),
                 transforms.ToTensor(),
                 transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
             ])
             train_dataset = Clothing1M(data_root, split='noisy_train', transform=transform_train, **kwargs)
             test_dataset = Clothing1M(data_root, split='clean_test', transform=transform_test, **kwargs)
+
         case "cifar10n":
             transform_train = transforms.Compose([
                 transforms_v2.RandomCrop(32, padding=[4,]),
@@ -91,6 +95,7 @@ def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
             ])
             train_dataset = CIFAR10N(data_root, transform=transform_train, **kwargs)
             test_dataset = CIFAR10(data_root, train=False, transform=transform_test)
+
         case "cifar100n":
             transform_train = transforms.Compose([
                 transforms_v2.RandomCrop(32, padding=[4,]),
@@ -105,7 +110,128 @@ def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
             train_dataset = CIFAR100N(data_root, transform=transform_train, **kwargs)
             test_dataset = CIFAR100(data_root, train=False, transform=transform_test)
 
+        case "animal10n":
+            transform_train = transforms.Compose([
+                transforms.RandomCrop(64, padding=4),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
+            ])
+            transform_test = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
+            ])
+            train_dataset = Animal10N(data_root, train=True, transform=transform_train, **kwargs)
+            test_dataset = Animal10N(data_root, train=False, transform=transform_test)
+
+        case "webvision":
+            # transform_train = transforms.Compose([ # dividemix style
+            #     transforms.Resize(320),
+            #     transforms.RandomResizedCrop(299),
+            #     transforms.RandomHorizontalFlip(),
+            #     transforms.ToTensor(),
+            #     transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
+            #     ])
+            # transform_test = transforms.Compose([
+            #     transforms.Resize(320),
+            #     transforms.CenterCrop(299),
+            #     transforms.ToTensor(),
+            #     transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
+            #     ])
+            transform_train = transforms.Compose([ # normalized loss style
+                transforms.RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                transforms.ColorJitter(brightness=0.4,
+                                        contrast=0.4,
+                                        saturation=0.4,
+                                        hue=0.2),
+                transforms.ToTensor(),
+                transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
+                ])
+            transform_test = transforms.Compose([
+                transforms.Resize(256),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
+                ])
+            # transform_train = transforms.Compose([ # ELR style
+            #     transforms.RandomCrop(227),
+            #     transforms.RandomHorizontalFlip(),
+            #     transforms.ToTensor(),
+            #     transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
+            # ])
+            # transform_test = transforms.Compose([
+            #     transforms.CenterCrop(227),
+            #     transforms.ToTensor(),
+            #     transforms.Normalize((0.485, 0.456, 0.406),(0.229, 0.224, 0.225)),
+            # ])
+            # transform_imagenet = transforms.Compose([
+            #     transforms.Resize(256),
+            #     transforms.CenterCrop(227),
+            #     transforms.ToTensor(),
+            #     transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
+            # ])
+            train_dataset = WebVisionV1(data_root, split='train', transform=transform_train, **kwargs)
+            test_dataset = WebVisionV1(data_root, split='val', transform=transform_test)
+        case "cifar10":
+            transform_train = transforms.Compose([
+                transforms_v2.RandomCrop(32, padding=[4,]),
+                transforms_v2.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+            ])
+            transform_test = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+            ])
+            train_dataset = CIFAR10(data_root, transform=transform_train, **kwargs)
+            test_dataset = CIFAR10(data_root, train=False, transform=transform_test)
+        case "cifar100":
+            transform_train = transforms.Compose([
+                transforms_v2.RandomCrop(32, padding=[4,]),
+                transforms_v2.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+            ])
+            transform_test = transforms.Compose([
+                transforms.ToTensor(),
+                transforms.Normalize(*CIFAR10_MEAN_STD, inplace=True),
+            ])
+            train_dataset = CIFAR100(data_root, transform=transform_train, **kwargs)
+            test_dataset = CIFAR100(data_root, train=False, transform=transform_test)
+
         case _:
-            raise NotImplementedError
+            raise NotImplementedError(dataset_name)
 
     return train_dataset, test_dataset
+
+
+class MultiEpochsDataLoader(DataLoader):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._DataLoader__initialized = False
+        self.batch_sampler = _RepeatSampler(self.batch_sampler)
+        self._DataLoader__initialized = True
+        self.iterator = super().__iter__()
+
+    def __len__(self):
+        return len(self.batch_sampler.sampler)
+
+    def __iter__(self):
+        for i in range(len(self)):
+            yield next(self.iterator)
+
+
+class _RepeatSampler(object):
+    """ Sampler that repeats forever.
+    Args:
+        sampler (Sampler)
+    """
+
+    def __init__(self, sampler):
+        self.sampler = sampler
+
+    def __iter__(self):
+        while True:
+            yield from iter(self.sampler)

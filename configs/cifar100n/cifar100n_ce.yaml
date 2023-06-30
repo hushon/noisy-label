@@ -1,10 +1,10 @@
 data:
-  dataset: cifar100n
+  dataset: animal10n
   download: true
 
 model:
   architecture: resnet18
-  num_classes: 100
+  num_classes: 10
 
 wandb:
   mode: online # "disabled" or "online"

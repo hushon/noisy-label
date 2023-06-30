@@ -8,27 +8,35 @@ import wandb
 from wandb.sdk.wandb_run import Run
 import pdb
 from models import MeanAbsoluteError, ReverseCrossEntropyLoss, SymmetricCrossEntropyLoss, \
-    GeneralizedCrossEntropyLoss
-from models import KLDivDistillationLoss, L1DistillationLoss, SmoothL1DistillationLoss
+    GeneralizedCrossEntropyLoss, CrossEntropyDistillationLoss
+from models import KLDivDistillationLoss, L1DistillationLoss, SmoothL1DistillationLoss, Normalize2D
 import torchvision
 torchvision.disable_beta_transforms_warning()
 from torchvision import transforms
 import torchvision.transforms.v2 as transforms_v2
 import numpy as np
 import datasets
+from collections import defaultdict
 
 
 class Trainer:
-    def __init__(self, model: nn.Module, config: dict, wandb_run: Run, device='cuda:0'):
+    def __init__(self, model: nn.Module, config: dict, wandb_run: Run=None, device='cuda:0'):
         self.device = torch.device(device)
-        self.model = model.to(self.device)
+        self.model = model
+        if os.environ.get('COMPILE', '0') == '1':
+            pass
+        else:
+            self.model = torch.compile(self.model)
+            # self.model = torch.jit.script(self.model)
+        self.model = self.model.to(self.device)
         self.config = config
         self.wandb_run = wandb_run
         self.criterion = self.get_loss_fn(self.config["loss_fn"]).to(self.device)
 
-    def get_optimizer(self,
-                      model: nn.Module
-                      ) -> torch.optim.Optimizer:
+    def get_optimizer(
+            self,
+            model: nn.Module
+        ) -> torch.optim.Optimizer:
         match self.config["optimizer"]:
             case "sgd":
                 optimizer = torch.optim.SGD(
@@ -47,9 +55,10 @@ class Trainer:
                 raise NotImplementedError(self.config["optimizer"])
         return optimizer
 
-    def get_lr_scheduler(self,
-                         optimizer: torch.optim.Optimizer
-                         ) -> torch.optim.lr_scheduler.LRScheduler:
+    def get_lr_scheduler(
+            self,
+            optimizer: torch.optim.Optimizer
+        ) -> torch.optim.lr_scheduler.LRScheduler:
         match self.config["lr_scheduler"]:
             case "cosine":
                 lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
@@ -105,6 +114,8 @@ class Trainer:
                 fn = L1DistillationLoss(temperature, reduction="none")
             case "smoothed_l1_dist":
                 fn = SmoothL1DistillationLoss(temperature, reduction="none")
+            case "cross_entropy":
+                fn = CrossEntropyDistillationLoss(temperature, reduction="none")
             case _:
                 raise NotImplementedError(fn_name)
         return fn
@@ -117,48 +128,127 @@ class Trainer:
             #     transform = transforms.Compose([
             #         transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1).contiguous()),
             #     ]) # output is a (3, 32, 32) uint8 tensor
+            case "none":
+                match dataset_type:
+                    case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
+                        transform = transforms_v2.ToImageTensor()
+                    case datasets.Clothing1M | datasets.WebVisionV1:
+                        transform = nn.Sequential(
+                            transforms_v2.Resize(256),
+                            transforms_v2.RandomCrop(224),
+                            transforms_v2.ToImageTensor(),
+                            )
+                    case datasets.WebVisionV1:
+                        transform = transforms.Compose([ # normalized loss style
+                            transforms_v2.Resize(256),
+                            transforms_v2.CenterCrop(224),
+                            transforms_v2.ToImageTensor(),
+                            ])
+                    case _:
+                        raise NotImplementedError(dataset_type)
             case "randomcrop":
-                if dataset_type in [datasets.CIFAR10, datasets.NoisyCIFAR10, datasets.NoisyCIFAR3, datasets.CIFAR10N, datasets.CIFAR100, datasets.NoisyCIFAR100, datasets.CIFAR100N]:
-                    transform = nn.Sequential(
-                        transforms_v2.RandomCrop(32, padding=4),
-                        transforms_v2.RandomHorizontalFlip(),
-                        )
-                else:
-                    transform = nn.Sequential(
-                        transforms_v2.RandomResizedCrop(224),
-                        transforms_v2.RandomHorizontalFlip(),
-                        )
+                match dataset_type:
+                    case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
+                        transform = nn.Sequential(
+                            transforms_v2.RandomCrop(32, padding=4),
+                            transforms_v2.RandomHorizontalFlip(),
+                            transforms_v2.ToImageTensor(),
+                            )
+                    case datasets.Clothing1M | datasets.WebVisionV1:
+                        transform = nn.Sequential(
+                            transforms_v2.Resize(256),
+                            transforms_v2.RandomCrop(224),
+                            transforms_v2.RandomHorizontalFlip(),
+                            transforms_v2.ToImageTensor(),
+                            )
+                    case datasets.WebVisionV1:
+                        transform = transforms.Compose([ # normalized loss style
+                            transforms_v2.RandomResizedCrop(224),
+                            transforms_v2.RandomHorizontalFlip(),
+                            transforms_v2.ToImageTensor(),
+                            ])
+                    case _:
+                        raise NotImplementedError(dataset_type)
             case "autoaugment":
-                if dataset_type in [datasets.CIFAR10, datasets.NoisyCIFAR10, datasets.NoisyCIFAR3, datasets.CIFAR10N, datasets.CIFAR100, datasets.NoisyCIFAR100, datasets.CIFAR100N]:
-                    transform = nn.Sequential(
-                        transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
-                        )
-                else:
-                    transform = nn.Sequential(
-                        transforms_v2.Resize(256),
-                        transforms_v2.CenterCrop(224),
-                        transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
-                        )
+                match dataset_type:
+                    case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
+                        transform = nn.Sequential(
+                            transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+                            transforms_v2.ToImageTensor(),
+                            )
+                    case datasets.Clothing1M | datasets.WebVisionV1:
+                        transform = nn.Sequential(
+                            transforms_v2.Resize(256),
+                            transforms_v2.CenterCrop(224),
+                            transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
+                            transforms_v2.ToImageTensor(),
+                            )
+                    case _:
+                        raise NotImplementedError(dataset_type)
+            case "gaussianblur":
+                match dataset_type:
+                    case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
+                        transform = nn.Sequential(
+                            transforms_v2.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0)),
+                            transforms_v2.RandomHorizontalFlip(),
+                            transforms_v2.ToImageTensor(),
+                            )
+                    case _:
+                        raise NotImplementedError(dataset_type)
+            case "sharpen":
+                match dataset_type:
+                    case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
+                        transform = nn.Sequential(
+                            transforms_v2.RandomAdjustSharpness(sharpness_factor=2.0, p=0.5),
+                            transforms_v2.RandomHorizontalFlip(),
+                            transforms_v2.ToImageTensor(),
+                            )
+                    case _:
+                        raise NotImplementedError(dataset_type)
+            case "rotate":
+                match dataset_type:
+                    case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
+                        transform = nn.Sequential(
+                            transforms_v2.RandomRotation(degrees=15),
+                            transforms_v2.RandomHorizontalFlip(),
+                            transforms_v2.ToImageTensor(),
+                            )
+                    case _:
+                        raise NotImplementedError(dataset_type)
+            case "colorjitter":
+                match dataset_type:
+                    case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
+                        transform = nn.Sequential(
+                            transforms_v2.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
+                            transforms_v2.RandomHorizontalFlip(),
+                            transforms_v2.ToImageTensor(),
+                            )
+                    case _:
+                        raise NotImplementedError(dataset_type)
             case _:
                 raise NotImplementedError(op_name)
-        match dataset_type: # image normalization parameters
-            case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N:
-                normalize = transforms_v2.Normalize(*datasets.CIFAR10_MEAN_STD, inplace=True)
-            case datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
-                normalize = transforms_v2.Normalize(*datasets.CIFAR100_MEAN_STD, inplace=True)
-            case datasets.Clothing1M:
-                normalize = transforms_v2.Normalize(*datasets.IMAGENET_MEAN_STD, inplace=True)
-            case _:
-                raise NotImplementedError(dataset_type)
-        transform = transform + nn.Sequential( # append ToTensor and normalization
-            transforms_v2.ToImageTensor(),
-            transforms_v2.ConvertDtype(),
-            normalize,
-            )
         return transform
 
+    @staticmethod
+    def get_normalization(dataset: Dataset):
+        dataset_type = type(dataset)
+        match dataset_type: # image normalization parameters
+            case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N:
+                mean, std = datasets.CIFAR10_MEAN_STD
+            case datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
+                mean, std = datasets.CIFAR100_MEAN_STD
+            case datasets.Clothing1M | datasets.WebVisionV1:
+                mean, std = datasets.IMAGENET_MEAN_STD
+            case _:
+                raise NotImplementedError(dataset_type)
+        return nn.Sequential(
+            transforms_v2.ConvertDtype(),
+            Normalize2D(mean, std),
+        )
+
     def get_dataloader(self, dataset: Dataset, train=True) -> DataLoader:
-        return DataLoader(
+        # return DataLoader(
+        return datasets.MultiEpochsDataLoader(
             dataset,
             batch_size=self.config["batch_size"],
             shuffle=train,
@@ -167,14 +257,10 @@ class Trainer:
         )
 
     def fit(self, train_dataset: Dataset, val_dataset: Dataset):
-        train_dataset.transform = self.get_transform('randomcrop', train_dataset)
+        train_dataset.transform = self.get_transform(self.config['aug'], train_dataset)
 
         train_dataloader = self.get_dataloader(train_dataset, train=True)
         val_dataloader = self.get_dataloader(val_dataset, train=False)
-
-        self.model = torch.compile(self.model)
-        # self.model = torch.jit.script(self.model)
-        dp_model = nn.DataParallel(self.model)
 
         optimizer = self.get_optimizer(self.model)
         lr_scheduler = self.get_lr_scheduler(optimizer)
@@ -184,30 +270,31 @@ class Trainer:
                                   type='model',
                                   metadata=self.wandb_run.config['model'])
 
+        normalize = self.get_normalization(train_dataset).to(self.device)
+
         for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
-            train_stats = {
-                "loss": [],
-                "t1acc": [],
-                "t5acc": [],
-            }
+            train_stats = AverageMeter()
             self.model.train()
             for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
                 target = batch["target"].to(self.device)
-                data = batch["image"]
+                data = batch["image"].to(self.device)
+                data = normalize(data)
                 with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
-                    output = dp_model(data)
+                    output = self.model(data)
                     loss = self.criterion(output, target).mean()
                 optimizer.zero_grad()
                 grad_scaler.scale(loss).backward()
                 grad_scaler.step(optimizer)
                 grad_scaler.update()
-                train_stats["loss"].append(loss.detach())
-                train_stats["t1acc"].append(calculate_accuracy(output, target))
-                train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
+                train_stats.update(
+                    target.size(0),
+                    loss=loss.detach(),
+                    t1acc=calculate_accuracy(output, target),
+                    t5acc=calculate_accuracy(output, target, k=5),
+                )
+
             lr_scheduler.step()
-            train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
-            train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
-            train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
+            train_stats = train_stats.get_average()
 
             val_stats = self._evaluate(val_dataloader)
             tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
@@ -231,10 +318,6 @@ class Trainer:
         train_dataloader = self.get_dataloader(train_dataset, train=True)
         val_dataloader = self.get_dataloader(val_dataset, train=False)
 
-        self.model = torch.compile(self.model)
-        # self.model = torch.jit.script(self.model)
-        dp_model = nn.DataParallel(self.model)
-
         optimizer = self.get_optimizer(self.model)
         lr_scheduler = self.get_lr_scheduler(optimizer)
         grad_scaler = torch.cuda.amp.GradScaler(enabled=self.config["enable_amp"])
@@ -246,25 +329,23 @@ class Trainer:
         distill_criterion = self.get_distill_loss_fn(
                                             self.config["distill_loss_fn"],
                                             self.config['temperature']
-                                            )
+                                            ).to(self.device)
         alpha = self.config['alpha']
 
+        normalize = self.get_normalization(train_dataset).to(self.device)
+
         for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
-            train_stats = {
-                "loss": [],
-                "t1acc": [],
-                "t5acc": [],
-                "target_loss": [],
-                "distill_loss": [],
-            }
+            train_stats = AverageMeter()
             self.model.train()
             for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
                 target = batch["target"].to(self.device)
-                data, data2 = batch["image"], batch['image2']
+                data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
+                data = normalize(data)
+                data2 = normalize(data2)
                 with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
-                    output = dp_model(data)
+                    output = self.model(data)
                     with torch.no_grad():
-                        output_teacher = dp_model(data2)
+                        output_teacher = self.model(data2)
                     target_loss = self.criterion(output, target).mean()
                     distill_loss = distill_criterion(output, output_teacher).mean()
                     loss = target_loss * alpha + distill_loss * (1.0-alpha)
@@ -272,18 +353,17 @@ class Trainer:
                 grad_scaler.scale(loss).backward()
                 grad_scaler.step(optimizer)
                 grad_scaler.update()
-                train_stats["loss"].append(loss.detach())
-                train_stats["t1acc"].append(calculate_accuracy(output, target))
-                train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
-                train_stats["target_loss"].append(target_loss.detach())
-                train_stats["distill_loss"].append(distill_loss.detach())
+                train_stats.update(
+                    target.size(0),
+                    loss=loss.detach(),
+                    t1acc=calculate_accuracy(output, target),
+                    t5acc=calculate_accuracy(output, target, k=5),
+                    target_loss=target_loss.detach(),
+                    distill_loss=distill_loss.detach()
+                )
             lr_scheduler.step()
-            train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
-            train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
-            train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
-            train_stats["target_loss"] = torch.stack(train_stats["target_loss"]).mean().item()
-            train_stats["distill_loss"] = torch.stack(train_stats["distill_loss"]).mean().item()
 
+            train_stats = train_stats.get_average()
             val_stats = self._evaluate(val_dataloader)
             tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
             self.wandb_run.log(
@@ -368,6 +448,85 @@ class Trainer:
                 torch.save(self.model.state_dict(), filepath)
                 self.wandb_run.save(filepath)
 
+    def fit_nrosd_hardlabel(self, train_dataset: Dataset, val_dataset: Dataset):
+        train_dataset.transform = self.get_transform(self.config['student_aug'], train_dataset)
+        train_dataset.transform2 = self.get_transform(self.config['teacher_aug'], train_dataset)
+
+        train_dataloader = self.get_dataloader(train_dataset, train=True)
+        val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        optimizer = self.get_optimizer(self.model)
+        lr_scheduler = self.get_lr_scheduler(optimizer)
+        grad_scaler = torch.cuda.amp.GradScaler(enabled=self.config["enable_amp"])
+        # artifact = wandb.Artifact(f'checkpoints_{self.wandb_run.id}',
+        artifact = wandb.Artifact(f'checkpoints',
+                                  type='model',
+                                  metadata=self.wandb_run.config['model'])
+
+        distill_criterion = self.get_distill_loss_fn(
+                                            self.config["distill_loss_fn"],
+                                            self.config['temperature']
+                                            ).to(self.device)
+        alpha = self.config['alpha']
+
+        normalize = self.get_normalization(train_dataset).to(self.device)
+
+        for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
+            train_stats = {
+                "loss": [],
+                "t1acc": [],
+                "t5acc": [],
+                "target_loss": [],
+                "distill_loss": [],
+            }
+            self.model.train()
+            for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
+                target = batch["target"].to(self.device)
+                data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
+                data = normalize(data)
+                data2 = normalize(data2)
+                with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
+                    self.model.train()
+                    output = self.model(data)
+                    with torch.no_grad():
+                        self.model.eval()
+                        output_teacher = self.model(data2)
+                    target_loss = self.criterion(output, target).mean()
+                    output_teacher = output_teacher.argmax(-1)
+                    output_teacher = F.one_hot(output_teacher, num_classes=self.model.fc.out_features).float()
+                    distill_loss = distill_criterion(output, output_teacher).mean()
+                    loss = target_loss * alpha + distill_loss * (1.0-alpha)
+                optimizer.zero_grad()
+                grad_scaler.scale(loss).backward()
+                grad_scaler.step(optimizer)
+                grad_scaler.update()
+                train_stats["loss"].append(loss.detach())
+                train_stats["t1acc"].append(calculate_accuracy(output, target))
+                train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
+                train_stats["target_loss"].append(target_loss.detach())
+                train_stats["distill_loss"].append(distill_loss.detach())
+            lr_scheduler.step()
+            train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
+            train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
+            train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
+            train_stats["target_loss"] = torch.stack(train_stats["target_loss"]).mean().item()
+            train_stats["distill_loss"] = torch.stack(train_stats["distill_loss"]).mean().item()
+
+            val_stats = self._evaluate(val_dataloader)
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
+            self.wandb_run.log(
+                {
+                    "learning_rate": lr_scheduler.get_last_lr()[0],
+                    **{'train_'+k: v for k, v in train_stats.items()},
+                    **{'val_'+k: v for k, v in val_stats.items()},
+                }
+            )
+            if self.config["save_model"] and (epoch+1)%10 == 0:
+                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
+                torch.save(self.model.state_dict(), filepath)
+                artifact.add_file(filepath)
+        self.wandb_run.log_artifact(artifact)
+
     def distill_perturb(self, train_dataset: Dataset, val_dataset: Dataset, teacher_model: nn.Module, N_aug: int = 100):
 
         train_dataset.transform = transforms.Compose([
@@ -440,28 +599,22 @@ class Trainer:
                 torch.save(self.model.state_dict(), filepath)
                 self.wandb_run.save(filepath)
 
-
     @torch.no_grad()
     def _evaluate(self, dataloader: DataLoader) -> dict:
         self.model.eval()
-        stats = {
-            "loss": [],
-            "t1acc": [],
-            "t5acc": [],
-        }
-        total_size = 0
+        stats = AverageMeter()
         for batch in dataloader:
             data, target = batch["image"].to(self.device), batch["target"].to(self.device)
-            total_size += data.size(0)
             with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
                 output = self.model(data).float()
                 loss = self.criterion(output, target).mean()
-            stats["loss"].append(loss.detach()*data.size(0))
-            stats["t1acc"].append(calculate_accuracy(output, target)*data.size(0))
-            stats["t5acc"].append(calculate_accuracy(output, target, k=5)*data.size(0))
-        stats["loss"] = torch.tensor(stats["loss"]).sum().div(total_size).item()
-        stats["t1acc"] = torch.tensor(stats["t1acc"]).sum().div(total_size).item()
-        stats["t5acc"] = torch.tensor(stats["t5acc"]).sum().div(total_size).item()
+            stats.update(
+                data.size(0),
+                loss=loss.detach(),
+                t1acc=calculate_accuracy(output, target),
+                t5acc=calculate_accuracy(output, target, k=5),
+            )
+        stats = stats.get_average()
         return stats
 
     @torch.no_grad()
@@ -719,6 +872,81 @@ class Trainer:
                 artifact.add_file(filepath)
         self.wandb_run.log_artifact(artifact)
 
+    def fit_nrosd_ablation1(self, train_dataset: Dataset, val_dataset: Dataset):
+        train_dataset.transform = self.get_transform(self.config['student_aug'], train_dataset)
+        train_dataset.transform2 = self.get_transform(self.config['teacher_aug'], train_dataset)
+
+        train_dataloader = self.get_dataloader(train_dataset, train=True)
+        val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        self.model = torch.compile(self.model)
+        # self.model = torch.jit.script(self.model)
+        dp_model = nn.DataParallel(self.model)
+
+        optimizer = self.get_optimizer(self.model)
+        lr_scheduler = self.get_lr_scheduler(optimizer)
+        grad_scaler = torch.cuda.amp.GradScaler(enabled=self.config["enable_amp"])
+        # artifact = wandb.Artifact(f'checkpoints_{self.wandb_run.id}',
+        artifact = wandb.Artifact(f'checkpoints',
+                                  type='model',
+                                  metadata=self.wandb_run.config['model'])
+
+        distill_criterion = self.get_distill_loss_fn(
+                                            self.config["distill_loss_fn"],
+                                            self.config['temperature']
+                                            )
+        alpha = self.config['alpha']
+
+        for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
+            train_stats = {
+                "loss": [],
+                "t1acc": [],
+                "t5acc": [],
+                "target_loss": [],
+                "distill_loss": [],
+            }
+            self.model.train()
+            for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
+                target = batch["target"].to(self.device)
+                data, data2 = batch["image"], batch['image2']
+                with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
+                    output = dp_model(data)
+                    output_teacher = dp_model(data2)
+                    target_loss = self.criterion(output, target).mean()
+                    distill_loss = distill_criterion(output, output_teacher).mean()
+                    loss = target_loss * alpha + distill_loss * (1.0-alpha)
+                optimizer.zero_grad()
+                grad_scaler.scale(loss).backward()
+                grad_scaler.step(optimizer)
+                grad_scaler.update()
+                train_stats["loss"].append(loss.detach())
+                train_stats["t1acc"].append(calculate_accuracy(output, target))
+                train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
+                train_stats["target_loss"].append(target_loss.detach())
+                train_stats["distill_loss"].append(distill_loss.detach())
+            lr_scheduler.step()
+            train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
+            train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
+            train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
+            train_stats["target_loss"] = torch.stack(train_stats["target_loss"]).mean().item()
+            train_stats["distill_loss"] = torch.stack(train_stats["distill_loss"]).mean().item()
+
+            val_stats = self._evaluate(val_dataloader)
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
+            self.wandb_run.log(
+                {
+                    "learning_rate": lr_scheduler.get_last_lr()[0],
+                    **{'train_'+k: v for k, v in train_stats.items()},
+                    **{'val_'+k: v for k, v in val_stats.items()},
+                }
+            )
+            if self.config["save_model"] and (epoch+1)%10 == 0:
+                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
+                torch.save(self.model.state_dict(), filepath)
+                artifact.add_file(filepath)
+        self.wandb_run.log_artifact(artifact)
+
+
 
 @torch.no_grad()
 def calculate_accuracy(pred: torch.Tensor, target: torch.Tensor, k=1):
@@ -728,3 +956,24 @@ def calculate_accuracy(pred: torch.Tensor, target: torch.Tensor, k=1):
     correct = pred.eq(target[..., None].expand_as(pred)).any(dim=-1)
     accuracy = correct.float().mean().mul(100.0)
     return accuracy
+
+
+class AverageMeter:
+    def __init__(self):
+        self.cnt = 0
+        self.stats = defaultdict(int)
+
+    @torch.no_grad()
+    def update(self, size: int, **kwargs):
+        """
+        size: batch size
+        kwargs: key-value pairs of stats to update
+        """
+        a = self.cnt / (self.cnt + size)
+        b = size / (self.cnt + size)
+        for key, value in kwargs.items():
+            self.stats[key] = a*self.stats[key] + b*value
+        self.cnt += size
+
+    def get_average(self) -> dict:
+        return self.stats

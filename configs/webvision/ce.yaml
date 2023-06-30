@@ -1,0 +1,30 @@
+method: vanilla
+
+data:
+  dataset: webvision
+
+model:
+  architecture: resnet50_torchvision
+  num_classes: 50
+  pretrained: false
+
+wandb:
+  mode: online # "disabled" or "online"
+  entity: hyounguk-shon
+  project: noisy-label
+  name: WebVision-CE
+  save_code: true
+
+trainer:
+  enable_amp: true
+  optimizer: sgd
+  init_lr: 0.1
+  momentum: 0.9
+  weight_decay: 1.0e-4
+  lr_scheduler: cosine
+  max_epoch: 120
+  num_workers: 10
+  batch_size: 128
+  save_model: true
+  loss_fn: cross_entropy
+  aug: randomcrop

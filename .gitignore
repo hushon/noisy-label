@@ -2,9 +2,10 @@ __pycache__/
 data/
 .vscode/
 wandb/
-*.ipynb
 *.pth
 *.pt
 temp/
 */.ipynb_checkpoints
 .ipynb_checkpoints
+*.code-workspace
+*.zip

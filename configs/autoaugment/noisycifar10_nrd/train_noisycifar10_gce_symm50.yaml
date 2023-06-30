@@ -1,0 +1,37 @@
+data:
+  dataset: noisy_cifar10
+  noise_rate: 0.5
+  noise_type: symmetric
+  random_seed: 42
+  download: true
+
+model:
+  architecture: resnet18
+  num_classes: 10
+
+wandb:
+  mode: online # "disabled" or "online"
+  entity: hyounguk-shon
+  project: noisy-label
+  name: NoisyCIFAR10(symm,0.5)-GCE-NRD
+  save_code: true
+
+trainer:
+  optimizer: sgd
+  init_lr: 1.0e-1
+  momentum: 0.9
+  weight_decay: 1.0e-4
+  lr_scheduler: multistep
+  max_epoch: 200
+  loss_fn: generalized_cross_entropy
+  alpha: 0.1
+  teacher_aug: randomcrop
+  student_aug: autoaugment
+  distill_loss_fn: smoothed_l1_dist
+  temperature: 1.0
+  num_workers: 2
+  batch_size: 128
+  save_model: true
+  enable_amp: false
+  loss_param:
+    q: 0.7

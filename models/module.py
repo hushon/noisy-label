@@ -15,7 +15,7 @@ class MeanAbsoluteError(torch.nn.Module):
     '''
     def __init__(self, scale=1.0, reduction="mean"):
         super().__init__()
-        self.scale = scale
+        self.register_buffer('scale', torch.tensor(scale))
         self.reduction = reduction
 
     def forward(self, pred, labels):
@@ -47,7 +47,7 @@ class ReverseCrossEntropyLoss(nn.Module):
     def __init__(self, num_classes, scale=1.0, reduction="mean"):
         super().__init__()
         self.num_classes = num_classes
-        self.scale = scale
+        self.register_buffer('scale', torch.tensor(scale))
         self.reduction = reduction
 
     def forward(self, pred, labels):
@@ -74,8 +74,8 @@ class SymmetricCrossEntropyLoss(nn.Module):
     '''
     def __init__(self, alpha=0.1, beta=1.0, num_classes=10, reduction="mean"):
         super().__init__()
-        self.alpha = alpha
-        self.beta = beta
+        self.register_buffer('alpha', torch.tensor(alpha))
+        self.register_buffer('beta', torch.tensor(beta))
         self.num_classes = num_classes
         self.reduction = reduction
         self.cross_entropy = nn.CrossEntropyLoss(reduction=self.reduction)
@@ -108,8 +108,8 @@ class GeneralizedCrossEntropyLoss(nn.Module):
     '''
     def __init__(self, num_classes, q=0.7, reduction="mean"):
         super().__init__()
+        self.register_buffer('q', torch.tensor(q))
         self.num_classes = num_classes
-        self.q = q
         self.reduction = reduction
 
     def forward(self, pred, labels):
@@ -136,7 +136,7 @@ class KLDivDistillationLoss(nn.KLDivLoss):
     """
     def __init__(self, temperature=1.0, reduction="none"):
         super().__init__(reduction=reduction)
-        self.temperature = temperature
+        self.register_buffer('temperature', torch.tensor(temperature))
 
     def forward(self, pred_logits, target_logits):
         x = pred_logits.div(self.temperature).log_softmax(-1)
@@ -155,7 +155,7 @@ class L1DistillationLoss(nn.L1Loss):
     """
     def __init__(self, temperature=1.0, reduction="none"):
         super().__init__(reduction=reduction)
-        self.temperature = temperature
+        self.register_buffer('temperature', torch.tensor(temperature))
 
     def forward(self, pred_logits, target_logits):
         x = pred_logits.div(self.temperature).softmax(-1)
@@ -174,7 +174,7 @@ class SmoothL1DistillationLoss(nn.SmoothL1Loss):
     """
     def __init__(self, temperature=1.0, reduction="none"):
         super().__init__(reduction=reduction)
-        self.temperature = temperature
+        self.register_buffer('temperature', torch.tensor(temperature))
 
     def forward(self, pred_logits, target_logits):
         x = pred_logits.div(self.temperature).softmax(-1)
@@ -183,6 +183,22 @@ class SmoothL1DistillationLoss(nn.SmoothL1Loss):
             loss = super().forward(x, y).sum(-1)
         else:
             loss = super().forward(x, y)
+        return loss * (self.temperature**2)
+
+
+class CrossEntropyDistillationLoss(nn.CrossEntropyLoss):
+    """
+    Modified nn.CrossEntropyLoss which
+    takes in logits instead of probabilities
+    """
+    def __init__(self, temperature=1.0, reduction="none"):
+        super().__init__(reduction=reduction)
+        self.register_buffer('temperature', torch.tensor(temperature))
+
+    def forward(self, pred_logits, target_logits):
+        x = pred_logits.div(self.temperature)
+        y = target_logits.div(self.temperature).softmax(-1)
+        loss = super().forward(x, y)
         return loss * (self.temperature**2)
 
 
@@ -219,3 +235,13 @@ class LambdaLayer(nn.Module):
 
     def forward(self, x):
         return self.func(x)
+
+
+class Normalize2D(nn.Module):
+    def __init__(self, mean, std):
+        super().__init__()
+        self.register_buffer("mean", torch.tensor(mean).view(1, -1, 1, 1))
+        self.register_buffer("std", torch.tensor(std).view(1, -1, 1, 1))
+
+    def forward(self, x):
+        return x.sub_(self.mean).div_(self.std)
