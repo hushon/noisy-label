@@ -12,7 +12,6 @@ import pprint
 from torchvision import transforms
 from datasets import get_dataset
 from models import get_model
-# import multiprocessing
 import torch.multiprocessing as multiprocessing
 
 
@@ -121,12 +120,14 @@ if __name__ == '__main__':
     #   temperature: 1.0
     #   enable_amp: false
     # """
-    """
+    r"""
     method: vanilla
 
     data:
-        dataset: cifar10
-        download: true
+      dataset: noisy_cifar10
+      noise_type: symmetric
+      noise_rate: 0.5
+      download: true
 
     model:
         architecture: resnet18
@@ -146,7 +147,7 @@ if __name__ == '__main__':
         weight_decay: 1.0e-4
         lr_scheduler: multistep
         max_epoch: 200
-        num_workers: 2
+        num_workers: 4
         batch_size: 128
         save_model: true
         loss_fn: cross_entropy
@@ -156,25 +157,21 @@ if __name__ == '__main__':
     """
     )
 
-    # for teacher_aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
-    #     for student_aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
-    #         config['trainer']['teacher_aug'] = teacher_aug
-    #         config['trainer']['student_aug'] = student_aug
-    #         main(config)
-
-    # for aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
-    #     config['trainer']['aug'] = aug
-    #     main(config)
+    # main(config)
 
 
+    # run a list of configs in parallel
     from concurrent.futures import ProcessPoolExecutor
     from copy import deepcopy
 
-    # run a list of configs in parallel
-    with ProcessPoolExecutor(max_workers=2) as pool:
-        for aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
-            config['trainer']['aug'] = aug
+    pool = ProcessPoolExecutor(max_workers=4)
+    # for aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
+    #     config['trainer']['aug'] = aug
+    for teacher_aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
+        for student_aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
+            config['trainer']['teacher_aug'] = teacher_aug
+            config['trainer']['student_aug'] = student_aug
             pool.submit(main, deepcopy(config))
-        pool.shutdown(wait=True)
+    pool.shutdown()
 
 
