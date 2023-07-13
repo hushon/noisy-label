@@ -26,7 +26,7 @@ torch.set_float32_matmul_precision('high')
 
 
 parser = argparse.ArgumentParser(description='Training Config', add_help=False)
-parser.add_argument('--config', type=str, help="./configs/train_base.yaml")
+parser.add_argument('config', type=str, help="./configs/train_base.yaml")
 args = parser.parse_args()
 
 
@@ -164,11 +164,15 @@ if __name__ == '__main__':
     from concurrent.futures import ProcessPoolExecutor
     from copy import deepcopy
 
-    pool = ProcessPoolExecutor(max_workers=4)
+    max_workers = torch.cuda.device_count()
+
+    pool = ProcessPoolExecutor(max_workers=max_workers)
     # for aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
     #     config['trainer']['aug'] = aug
+    # for teacher_aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
+        # for student_aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
     for teacher_aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
-        for student_aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
+        for student_aug in ['none']:
             config['trainer']['teacher_aug'] = teacher_aug
             config['trainer']['student_aug'] = student_aug
             pool.submit(main, deepcopy(config))

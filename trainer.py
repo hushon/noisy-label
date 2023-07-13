@@ -131,11 +131,13 @@ class Trainer:
             case "none":
                 match dataset_type:
                     case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
-                        transform = transforms_v2.ToImageTensor()
+                        transform = nn.Sequential(
+                            transforms_v2.ToImageTensor(),
+                        )
                     case datasets.Clothing1M | datasets.WebVisionV1:
                         transform = nn.Sequential(
                             transforms_v2.Resize(256),
-                            transforms_v2.RandomCrop(224),
+                            transforms_v2.CenterCrop(224),
                             transforms_v2.ToImageTensor(),
                             )
                     case datasets.WebVisionV1:
