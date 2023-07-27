@@ -31,7 +31,7 @@ args = parser.parse_args()
 
 
 def main(config):
-    pprint.pprint(config)
+    print(yaml.dump(config, allow_unicode=True, default_flow_style=False))
 
     if os.environ.get('DRYRUN', '0') == '1':
         config['wandb']['mode'] = 'disabled'
@@ -83,7 +83,7 @@ if __name__ == '__main__':
 
     config = yaml.safe_load(
     # r"""
-    # method: vanilla
+    # method: nrd
     
     # data:
     #   dataset: noisy_cifar10
@@ -116,7 +116,7 @@ if __name__ == '__main__':
     #   alpha: 0.5
     #   teacher_aug: randomcrop
     #   student_aug: gaussianblur
-    #   distill_loss_fn: kl_div
+    #   distill_loss_fn: cross_entropy
     #   temperature: 1.0
     #   enable_amp: false
     # """
@@ -167,15 +167,20 @@ if __name__ == '__main__':
     max_workers = torch.cuda.device_count()
 
     pool = ProcessPoolExecutor(max_workers=max_workers)
-    # for aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
-    #     config['trainer']['aug'] = aug
-    # for teacher_aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
-        # for student_aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
-    for teacher_aug in ['randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
-        for student_aug in ['none']:
-            config['trainer']['teacher_aug'] = teacher_aug
-            config['trainer']['student_aug'] = student_aug
+    # for teacher_aug in ['none', 'randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
+    #     for student_aug in ['none', 'randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
+    #         config['trainer']['teacher_aug'] = teacher_aug
+    #         config['trainer']['student_aug'] = student_aug
+    #         # config['trainer']['lr_scheduler'] = 'cosine'
+    #         config['trainer']['lr_scheduler'] = 'multistep2'
+    #         pool.submit(main, deepcopy(config))
+    for aug in ['none', 'randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
+        for lr_scheduler in ['multistep2', 'cosine']:
+            config['trainer']['aug'] = aug
+            config['trainer']['lr_scheduler'] = lr_scheduler
             pool.submit(main, deepcopy(config))
+
+
     pool.shutdown()
 
 

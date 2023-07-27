@@ -20,18 +20,14 @@ from collections import defaultdict
 
 
 class Trainer:
-    def __init__(self, model: nn.Module, config: dict, wandb_run: Run=None, device='cuda:0'):
+    def __init__(self, model: nn.Module, config: dict=None, wandb_run: Run=None, device='cuda:0'):
         self.device = torch.device(device)
         self.model = model
-        if os.environ.get('COMPILE', '0') == '1':
-            pass
-        else:
-            self.model = torch.compile(self.model)
-            # self.model = torch.jit.script(self.model)
+        # self.model = torch.compile(self.model)
+        # self.model = torch.jit.script(self.model)
         self.model = self.model.to(self.device)
         self.config = config
         self.wandb_run = wandb_run
-        self.criterion = self.get_loss_fn(self.config["loss_fn"]).to(self.device)
 
     def get_optimizer(
             self,
@@ -72,6 +68,13 @@ class Trainer:
                     optimizer,
                     milestones=[3*n, 6*n, 8*n],
                     gamma=0.2,
+                )
+            case "multistep2":
+                n = self.config["max_epoch"] // 10
+                lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                    optimizer,
+                    milestones=[4*n, 6*n],
+                    gamma=0.1,
                 )
             case _:
                 raise NotImplementedError(self.config["lr_scheduler"])
@@ -141,11 +144,11 @@ class Trainer:
                             transforms_v2.ToImageTensor(),
                             )
                     case datasets.WebVisionV1:
-                        transform = transforms.Compose([ # normalized loss style
+                        transform = nn.Sequential( # normalized loss style
                             transforms_v2.Resize(256),
                             transforms_v2.CenterCrop(224),
                             transforms_v2.ToImageTensor(),
-                            ])
+                            )
                     case _:
                         raise NotImplementedError(dataset_type)
             case "randomcrop":
@@ -164,11 +167,11 @@ class Trainer:
                             transforms_v2.ToImageTensor(),
                             )
                     case datasets.WebVisionV1:
-                        transform = transforms.Compose([ # normalized loss style
+                        transform = nn.Sequential( # normalized loss style
                             transforms_v2.RandomResizedCrop(224),
                             transforms_v2.RandomHorizontalFlip(),
                             transforms_v2.ToImageTensor(),
-                            ])
+                            )
                     case _:
                         raise NotImplementedError(dataset_type)
             case "autoaugment":
@@ -264,6 +267,8 @@ class Trainer:
         train_dataloader = self.get_dataloader(train_dataset, train=True)
         val_dataloader = self.get_dataloader(val_dataset, train=False)
 
+        self.criterion = self.get_loss_fn(self.config["loss_fn"]).to(self.device)
+
         optimizer = self.get_optimizer(self.model)
         lr_scheduler = self.get_lr_scheduler(optimizer)
         grad_scaler = torch.cuda.amp.GradScaler(enabled=self.config["enable_amp"])
@@ -320,6 +325,7 @@ class Trainer:
         train_dataloader = self.get_dataloader(train_dataset, train=True)
         val_dataloader = self.get_dataloader(val_dataset, train=False)
 
+        self.criterion = self.get_loss_fn(self.config["loss_fn"]).to(self.device)
         optimizer = self.get_optimizer(self.model)
         lr_scheduler = self.get_lr_scheduler(optimizer)
         grad_scaler = torch.cuda.amp.GradScaler(enabled=self.config["enable_amp"])
@@ -618,6 +624,22 @@ class Trainer:
             )
         stats = stats.get_average()
         return stats
+
+    @torch.no_grad()
+    def predict_batch(self, input: torch.Tensor) -> torch.Tensor:
+        self.model.eval()
+        return self.model(input.to(self.device))
+
+    @torch.no_grad()
+    def inference(self, dataset: Dataset) -> dict:
+        self.model.eval()
+        data_loader = self.get_dataloader(dataset, train=False)
+        results = defaultdict(list)
+        for batch in data_loader:
+            output = self.predict_batch(batch["image"])
+            results['logits'].append(output)
+        results = {k: torch.cat(v, dim=0) for k, v in results.items()}
+        return results
 
     @torch.no_grad()
     def filter_noisy(self, dataset):
