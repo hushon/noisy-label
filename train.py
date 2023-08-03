@@ -25,11 +25,6 @@ torch.backends.cudnn.allow_tf32 = True
 torch.set_float32_matmul_precision('high')
 
 
-parser = argparse.ArgumentParser(description='Training Config', add_help=False)
-parser.add_argument('config', type=str, help="./configs/train_base.yaml")
-args = parser.parse_args()
-
-
 def main(config):
     print(yaml.dump(config, allow_unicode=True, default_flow_style=False))
 
@@ -40,7 +35,6 @@ def main(config):
         **config['wandb'],
         config=config,
     )
-    wandb_run.save(args.config)
     wandb_run.log_code()
 
     # for multiprocessing
@@ -77,84 +71,88 @@ def main(config):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Training Config', add_help=False)
+    parser.add_argument('config', type=str, help="./configs/train_base.yaml")
+    args = parser.parse_args()
+
     # Load YAML config
     with open(args.config, 'r') as file:
         config = yaml.safe_load(file)
 
     config = yaml.safe_load(
-    # r"""
-    # method: nrd
-    
-    # data:
-    #   dataset: noisy_cifar10
-    #   noise_type: symmetric
-    #   noise_rate: 0.5
-    #   download: true
-    
-    # model:
-    #   architecture: resnet18
-    #   num_classes: 10
-    
-    # wandb:
-    #   mode: online # "disabled" or "online"
-    #   entity: hyounguk-shon
-    #   project: noisy-label
-    #   name: CIFAR10-CE
-    #   save_code: true
-    
-    # trainer:
-    #   optimizer: sgd
-    #   init_lr: 0.1
-    #   momentum: 0.9
-    #   weight_decay: 1.0e-4
-    #   lr_scheduler: multistep
-    #   max_epoch: 200
-    #   num_workers: 4
-    #   batch_size: 128
-    #   save_model: true
-    #   loss_fn: cross_entropy
-    #   alpha: 0.5
-    #   teacher_aug: randomcrop
-    #   student_aug: gaussianblur
-    #   distill_loss_fn: cross_entropy
-    #   temperature: 1.0
-    #   enable_amp: false
-    # """
     r"""
-    method: vanilla
-
+    method: nrd
+    
     data:
       dataset: noisy_cifar10
       noise_type: symmetric
       noise_rate: 0.5
       download: true
-
+    
     model:
-        architecture: resnet18
-        num_classes: 10
-
+      architecture: resnet18
+      num_classes: 10
+    
     wandb:
-        mode: online # "disabled" or "online"
-        entity: hyounguk-shon
-        project: noisy-label
-        name: CIFAR10-CE
-        save_code: true
-
+      mode: online # "disabled" or "online"
+      entity: hyounguk-shon
+      project: noisy-label
+      name: CIFAR10-CE
+      save_code: true
+    
     trainer:
-        optimizer: sgd
-        init_lr: 1.0e-1
-        momentum: 0.9
-        weight_decay: 1.0e-4
-        lr_scheduler: multistep
-        max_epoch: 200
-        num_workers: 4
-        batch_size: 128
-        save_model: true
-        loss_fn: cross_entropy
-        aug: none
-        enable_amp: false
-
+      optimizer: sgd
+      init_lr: 0.1
+      momentum: 0.9
+      weight_decay: 1.0e-4
+      lr_scheduler: multistep
+      max_epoch: 200
+      num_workers: 4
+      batch_size: 128
+      save_model: true
+      loss_fn: cross_entropy
+      alpha: 0.5
+      teacher_aug: randomcrop
+      student_aug: gaussianblur
+      distill_loss_fn: cross_entropy
+      temperature: 1.0
+      enable_amp: false
     """
+    # r"""
+    # method: vanilla
+
+    # data:
+    #   dataset: noisy_cifar10
+    #   noise_type: symmetric
+    #   noise_rate: 0.5
+    #   download: true
+
+    # model:
+    #     architecture: resnet18
+    #     num_classes: 10
+
+    # wandb:
+    #     mode: online # "disabled" or "online"
+    #     entity: hyounguk-shon
+    #     project: noisy-label
+    #     name: CIFAR10-CE
+    #     save_code: true
+
+    # trainer:
+    #     optimizer: sgd
+    #     init_lr: 1.0e-1
+    #     momentum: 0.9
+    #     weight_decay: 1.0e-4
+    #     lr_scheduler: multistep
+    #     max_epoch: 200
+    #     num_workers: 4
+    #     batch_size: 128
+    #     save_model: true
+    #     loss_fn: cross_entropy
+    #     aug: none
+    #     enable_amp: false
+
+    # """
     )
 
     # main(config)
@@ -174,11 +172,11 @@ if __name__ == '__main__':
     #         # config['trainer']['lr_scheduler'] = 'cosine'
     #         config['trainer']['lr_scheduler'] = 'multistep2'
     #         pool.submit(main, deepcopy(config))
-    for aug in ['none', 'randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
-        for lr_scheduler in ['multistep2', 'cosine']:
-            config['trainer']['aug'] = aug
-            config['trainer']['lr_scheduler'] = lr_scheduler
-            pool.submit(main, deepcopy(config))
+    # for aug in ['none', 'randomcrop', 'gaussianblur', 'rotate', 'colorjitter']:
+    #     for lr_scheduler in ['multistep2', 'cosine']:
+    #         config['trainer']['aug'] = aug
+    #         config['trainer']['lr_scheduler'] = lr_scheduler
+    #         pool.submit(main, deepcopy(config))
 
 
     pool.shutdown()
