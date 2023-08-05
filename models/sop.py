@@ -30,7 +30,7 @@ class overparametrization_loss(nn.Module):
 
     def forward(self, index, outputs, label):
         # label = torch.zeros(len(label), self.config['num_classes']).cuda().scatter_(1, label.view(-1,1), 1)
-        label = F.one_hot(label, num_classes=self.num_classes)
+        label = F.one_hot(label, num_classes=self.num_classes).float()
 
         if len(outputs) > len(index):
             output, output2 = torch.chunk(outputs, 2)
@@ -51,46 +51,18 @@ class overparametrization_loss(nn.Module):
 
         self.E = E
 
-        original_prediction = F.softmax(output, dim=1)
-
-        prediction = torch.clamp(original_prediction + U_square - V_square.detach(), min = eps)
-
-        prediction = F.normalize(prediction, p = 1, eps = eps)
-
-        prediction = torch.clamp(prediction, min = eps, max = 1.0)
-
         label_one_hot = self.soft_to_hard(output.detach())
+        MSE_loss = F.mse_loss(label_one_hot + U_square - V_square, label, reduction='none')
 
+        prediction = F.softmax(output, dim=1)
+        prediction = torch.clamp(prediction + U_square - V_square.detach(), min = eps)
+        prediction = F.normalize(prediction, p = 1, eps = eps)
+        prediction = torch.clamp(prediction, min = eps, max = 1.0)
+        ce_loss = -torch.sum((label) * prediction.log(), dim = -1)
+        # ce_loss = F.cross_entropy(prediction.log(), label, reduction='none')
 
-        MSE_loss = F.mse_loss((label_one_hot + U_square - V_square), label,  reduction='sum') / len(label)
+        return ce_loss + MSE_loss
 
-        
-        loss = torch.mean(-torch.sum((label) * torch.log(prediction), dim = -1))
-
-
-
-        loss += MSE_loss
-
-
-        # if self.ratio_balance > 0:
-        #     avg_prediction = torch.mean(prediction, dim=0)
-        #     prior_distr = 1.0/self.num_classes * torch.ones_like(avg_prediction)
-
-        #     avg_prediction = torch.clamp(avg_prediction, min = eps, max = 1.0)
-
-        #     balance_kl =  torch.mean(-(prior_distr * torch.log(avg_prediction)).sum(dim=0))
-
-        #     loss += self.ratio_balance * balance_kl
-
-        # if (len(outputs) > len(index)) and (self.ratio_consistency > 0):
-
-        #     consistency_loss = self.consistency_loss(index, output, output2)
-
-        #     loss += self.ratio_consistency * torch.mean(consistency_loss)
-
-
-
-        return  loss
 
 
     def consistency_loss(self, index, output1, output2):            
@@ -102,5 +74,6 @@ class overparametrization_loss(nn.Module):
 
 
     def soft_to_hard(self, x):
-        with torch.no_grad():
-            return (torch.zeros(len(x), self.config['num_classes'])).cuda().scatter_(1, (x.argmax(dim=1)).view(-1,1), 1)
+        return F.one_hot(x.argmax(dim=1), num_classes=self.num_classes).float()
+        # with torch.no_grad():
+        #     return (torch.zeros(len(x), self.config['num_classes'])).cuda().scatter_(1, (x.argmax(dim=1)).view(-1,1), 1)

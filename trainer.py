@@ -304,9 +304,9 @@ class Trainer:
                 output = self.model(transform_train(data))
                 with torch.no_grad():
                     output_teacher = self.model(transform_teacher(data))
-                target_loss = self.criterion(output, target).mean()
+                # target_loss = self.criterion(output, target).mean()
                 distill_loss = distill_criterion(output, output_teacher).mean()
-                sop_loss = sop(batch['index'], output, target)
+                target_loss = sop(batch['index'], output, target).mean()
                 loss = target_loss * alpha + distill_loss * (1.0-alpha)
                 optimizer.zero_grad()
                 optimizer_sop.zero_grad()
