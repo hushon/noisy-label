@@ -261,6 +261,84 @@ class Trainer:
                 artifact.add_file(filepath)
         self.wandb_run.log_artifact(artifact)
 
+    def fit_nrosd_sop(self, train_dataset: Dataset, val_dataset: Dataset):
+
+        from models import overparametrization_loss
+        sop = overparametrization_loss(len(train_dataset), 10)
+
+        train_dataset.transform = self.get_transform('totensor')
+        transform_train = self.get_transform(self.config['student_aug'])
+        transform_teacher = self.get_transform(self.config['teacher_aug'])
+
+        train_dataloader = self.get_dataloader(train_dataset, train=True)
+        val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        optimizer = self.get_optimizer(self.model)
+        optimizer_sop = torch.optim.SGD([
+            {'params': sop.u, 'lr': 1, 'momentum': 0, 'weight_decay': 0},
+            {'params': sop.v, 'lr': 10, 'momentum': 0, 'weight_decay': 0}
+        ])
+        lr_scheduler = self.get_lr_scheduler(optimizer)
+        # artifact = wandb.Artifact(f'checkpoints_{self.wandb_run.id}',
+        artifact = wandb.Artifact(f'checkpoints',
+                                  type='model',
+                                  metadata=self.wandb_run.config['model'])
+
+        distill_criterion = self.get_distill_loss_fn(
+                                            self.config["distill_loss_fn"],
+                                            self.config['temperature']
+                                            )
+        alpha = self.config['alpha']
+
+        for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True):
+            train_stats = {
+                "loss": [],
+                "t1acc": [],
+                "t5acc": [],
+                "target_loss": [],
+                "distill_loss": [],
+            }
+            self.model.train()
+            for batch in train_dataloader:
+                data, target = batch["image"].cuda(), batch["target"].cuda()
+                output = self.model(transform_train(data))
+                with torch.no_grad():
+                    output_teacher = self.model(transform_teacher(data))
+                target_loss = self.criterion(output, target).mean()
+                distill_loss = distill_criterion(output, output_teacher).mean()
+                sop_loss = sop(batch['index'], output, target)
+                loss = target_loss * alpha + distill_loss * (1.0-alpha)
+                optimizer.zero_grad()
+                optimizer_sop.zero_grad()
+                loss.backward()
+                optimizer.step()
+                train_stats["loss"].append(loss.detach())
+                train_stats["t1acc"].append(calculate_accuracy(output, target))
+                train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
+                train_stats["target_loss"].append(target_loss.detach())
+                train_stats["distill_loss"].append(distill_loss.detach())
+            lr_scheduler.step()
+            train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
+            train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
+            train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
+            train_stats["target_loss"] = torch.stack(train_stats["target_loss"]).mean().item()
+            train_stats["distill_loss"] = torch.stack(train_stats["distill_loss"]).mean().item()
+
+            val_stats = self._evaluate(val_dataloader)
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
+            self.wandb_run.log(
+                {
+                    "learning_rate": lr_scheduler.get_last_lr()[0],
+                    **{'train_'+k: v for k, v in train_stats.items()},
+                    **{'val_'+k: v for k, v in val_stats.items()},
+                }
+            )
+            if self.config["save_model"] and (epoch+1)%10 == 0:
+                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
+                torch.save(self.model.state_dict(), filepath)
+                artifact.add_file(filepath)
+        self.wandb_run.log_artifact(artifact)
+
     def distill(self, train_dataset: Dataset, val_dataset: Dataset, teacher_model: nn.Module):
         train_dataset.transform = transforms.Compose([
             transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1)),

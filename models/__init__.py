@@ -5,6 +5,7 @@ from .module import MCDropout, GaussianDropout, GaussianMCDropout, \
     L1DistillationLoss, SmoothL1DistillationLoss, \
     ReverseCrossEntropyLoss, SymmetricCrossEntropyLoss, \
     GeneralizedCrossEntropyLoss
+from .sop import overparametrization_loss
 
 
 def get_model(architecture, num_classes) -> nn.Module:
