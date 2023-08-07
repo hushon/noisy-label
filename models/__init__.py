@@ -6,6 +6,7 @@ from .module import MCDropout, GaussianDropout, GaussianMCDropout, \
     ReverseCrossEntropyLoss, SymmetricCrossEntropyLoss, \
     GeneralizedCrossEntropyLoss
 from .sop import overparametrization_loss
+from .elr import elr_loss
 
 
 def get_model(architecture, num_classes) -> nn.Module:
