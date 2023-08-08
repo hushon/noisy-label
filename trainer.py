@@ -66,8 +66,8 @@ class Trainer:
                 n = self.config["max_epoch"] // 10
                 lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
                     optimizer,
-                    milestones=[3*n, 6*n, 8*n],
-                    gamma=0.2,
+                    milestones=[5*n,],
+                    gamma=0.1,
                 )
             case "multistep2":
                 n = self.config["max_epoch"] // 10

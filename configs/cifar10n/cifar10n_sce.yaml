@@ -1,12 +1,13 @@
 method: vanilla
 
 data:
-  dataset: cifar100n
+  dataset: cifar10n
+  noise_type: worse_label
   download: true
 
 model:
   architecture: resnet34
-  num_classes: 100
+  num_classes: 10
 
 wandb:
   mode: online # "disabled" or "online"
@@ -26,8 +27,8 @@ trainer:
   batch_size: 128
   save_model: false
   aug: randomcrop
-  loss_fn: generalized_cross_entropy
-  alpha: 0.5
   enable_amp: false
+  loss_fn: symmetric_cross_entropy
   loss_param:
-    q: 0.7
+    alpha: 0.1
+    beta: 1.0

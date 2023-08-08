@@ -1,28 +1,30 @@
+method: nrd
+
 data:
   dataset: cifar100n
   download: true
 
 model:
-  architecture: resnet18
+  architecture: resnet34
   num_classes: 100
 
 wandb:
   mode: online # "disabled" or "online"
-  entity: siit-iitp
+  entity: hyounguk-shon
   project: noisy-label
-  name: CIFAR100N-NROSD-CE
+  name: table2-r34
   save_code: true
 
 trainer:
   optimizer: sgd
   init_lr: 0.1
   momentum: 0.9
-  weight_decay: 1.0e-4
+  weight_decay: 5.0e-4
   lr_scheduler: multistep
-  max_epoch: 200
-  num_workers: 8
+  max_epoch: 100
+  num_workers: 4
   batch_size: 128
-  save_model: true
+  save_model: false
   loss_fn: cross_entropy
   alpha: 0.5
   teacher_aug: autoaugment
