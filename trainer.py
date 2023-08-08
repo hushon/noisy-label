@@ -63,6 +63,20 @@ class Trainer:
                     milestones=[3*n, 6*n, 8*n],
                     gamma=0.2,
                 )
+            case "multistep_sop_c10":
+                n = self.config["max_epoch"] // 10
+                lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                    optimizer,
+                    milestones=[4*n, 8*n],
+                    gamma=0.1,
+                )
+            case "multistep_sop_c100":
+                n = self.config["max_epoch"] // 10
+                lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                    optimizer,
+                    milestones=[8*n, 12*n],
+                    gamma=0.1,
+                )
             case _:
                 raise NotImplementedError(self.config["lr_scheduler"])
         return lr_scheduler
@@ -190,6 +204,71 @@ class Trainer:
                 artifact.add_file(filepath)
         self.wandb_run.log_artifact(artifact)
 
+    def fit_sop(self, train_dataset: Dataset, val_dataset: Dataset):
+        from models import overparametrization_loss
+        sop = overparametrization_loss(len(train_dataset), len(train_dataset.classes)).cuda()
+
+        optimizer_sop = torch.optim.SGD([
+            {'params': sop.u, 'lr': self.config['lr_u'], 'momentum': 0, 'weight_decay': 0},
+            {'params': sop.v, 'lr': self.config['lr_v'], 'momentum': 0, 'weight_decay': 0}
+        ])
+
+        train_dataset.transform = self.get_transform('totensor')
+        transform_train = self.get_transform('randomcrop')
+        # transform_train = self.get_transform('autoaugment')
+
+        train_dataloader = self.get_dataloader(train_dataset, train=True)
+        val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        # self.model = torch.compile(self.model)
+        self.model = torch.jit.script(self.model)
+
+        optimizer = self.get_optimizer(self.model)
+        lr_scheduler = self.get_lr_scheduler(optimizer)
+        # artifact = wandb.Artifact(f'checkpoints_{self.wandb_run.id}',
+        artifact = wandb.Artifact(f'checkpoints',
+                                  type='model',
+                                  metadata=self.wandb_run.config['model'])
+
+        for epoch in tqdm.trange(self.config["max_epoch"]):
+            train_stats = {
+                "loss": [],
+                "t1acc": [],
+                "t5acc": [],
+            }
+            self.model.train()
+            for batch in train_dataloader:
+                data, target = batch["image"].cuda(), batch["target"].cuda()
+                output = self.model(transform_train(data))
+                loss = sop(batch['index'].cuda(), output, target).mean()
+                optimizer.zero_grad()
+                optimizer_sop.zero_grad()
+                loss.backward()
+                optimizer.step()
+                optimizer_sop.step()
+                train_stats["loss"].append(loss.detach())
+                train_stats["t1acc"].append(calculate_accuracy(output, target))
+                train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))
+            lr_scheduler.step()
+            train_stats["loss"] = torch.stack(train_stats["loss"]).mean().item()
+            train_stats["t1acc"] = torch.stack(train_stats["t1acc"]).mean().item()
+            train_stats["t5acc"] = torch.stack(train_stats["t5acc"]).mean().item()
+
+            val_stats = self._evaluate(val_dataloader)
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
+            self.wandb_run.log(
+                {
+                    "learning_rate": lr_scheduler.get_last_lr()[0],
+                    **{'train_'+k: v for k, v in train_stats.items()},
+                    **{'val_'+k: v for k, v in val_stats.items()},
+                }
+            )
+            if self.config["save_model"] and (epoch+1)%10 == 0:
+                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
+                torch.save(self.model.state_dict(), filepath)
+                artifact.add_file(filepath)
+        self.wandb_run.log_artifact(artifact)
+
     def fit_nrosd(self, train_dataset: Dataset, val_dataset: Dataset):
         train_dataset.transform = self.get_transform('totensor')
         transform_train = self.get_transform(self.config['student_aug'])
@@ -264,7 +343,7 @@ class Trainer:
     def fit_nrosd_sop(self, train_dataset: Dataset, val_dataset: Dataset):
 
         from models import overparametrization_loss
-        sop = overparametrization_loss(len(train_dataset), 10)
+        sop = overparametrization_loss(len(train_dataset), len(train_dataset.classes)).cuda()
 
         train_dataset.transform = self.get_transform('totensor')
         transform_train = self.get_transform(self.config['student_aug'])
@@ -275,8 +354,8 @@ class Trainer:
 
         optimizer = self.get_optimizer(self.model)
         optimizer_sop = torch.optim.SGD([
-            {'params': sop.u, 'lr': 1, 'momentum': 0, 'weight_decay': 0},
-            {'params': sop.v, 'lr': 10, 'momentum': 0, 'weight_decay': 0}
+            {'params': sop.u, 'lr': self.config['lr_u'], 'momentum': 0, 'weight_decay': 0},
+            {'params': sop.v, 'lr': self.config['lr_v'], 'momentum': 0, 'weight_decay': 0}
         ])
         lr_scheduler = self.get_lr_scheduler(optimizer)
         # artifact = wandb.Artifact(f'checkpoints_{self.wandb_run.id}',
@@ -301,17 +380,19 @@ class Trainer:
             self.model.train()
             for batch in train_dataloader:
                 data, target = batch["image"].cuda(), batch["target"].cuda()
+
                 output = self.model(transform_train(data))
                 with torch.no_grad():
                     output_teacher = self.model(transform_teacher(data))
                 # target_loss = self.criterion(output, target).mean()
                 distill_loss = distill_criterion(output, output_teacher).mean()
-                target_loss = sop(batch['index'], output, target).mean()
+                target_loss = sop(batch['index'].cuda(), output, target).mean()
                 loss = target_loss * alpha + distill_loss * (1.0-alpha)
                 optimizer.zero_grad()
                 optimizer_sop.zero_grad()
                 loss.backward()
                 optimizer.step()
+                optimizer_sop.step()
                 train_stats["loss"].append(loss.detach())
                 train_stats["t1acc"].append(calculate_accuracy(output, target))
                 train_stats["t5acc"].append(calculate_accuracy(output, target, k=5))

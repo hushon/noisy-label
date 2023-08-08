@@ -52,7 +52,7 @@ class overparametrization_loss(nn.Module):
         self.E = E
 
         label_one_hot = self.soft_to_hard(output.detach())
-        MSE_loss = F.mse_loss(label_one_hot + U_square - V_square, label, reduction='none')
+        MSE_loss = F.mse_loss(label_one_hot + U_square - V_square, label, reduction='none').sum(-1)
 
         prediction = F.softmax(output, dim=1)
         prediction = torch.clamp(prediction + U_square - V_square.detach(), min = eps)
