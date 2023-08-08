@@ -11,7 +11,7 @@ model:
 
 wandb:
   mode: online # "disabled" or "online"
-  entity: siit-iitp
+  entity: hyounguk-shon
   project: noisy-label
   name: NoisyCIFAR10(symm,0.5)-NROSD-CE
   save_code: true
@@ -25,7 +25,7 @@ trainer:
   max_epoch: 200
   num_workers: 2
   batch_size: 128
-  save_model: true
+  save_model: false
   loss_fn: cross_entropy
   alpha: 0.5
   teacher_aug: autoaugment
