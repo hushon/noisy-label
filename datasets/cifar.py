@@ -226,6 +226,7 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
             'image': img1,
             'target': target,
             'target_gt': self.targets_gt[index],
+            'index': index,
         }
         if self.transform2 is not None:
             output.update({
@@ -298,6 +299,7 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
             'image': img1,
             'target': target,
             'target_gt': self.targets_gt[index],
+            'index': index,
         }
         if self.transform2 is not None:
             output.update({
