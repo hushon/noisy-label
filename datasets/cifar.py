@@ -187,13 +187,13 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
         self._inject_label_noise(self.transition_matrix)
 
     @staticmethod
-    def _symmetric_transition_matrix(noise_rate) -> np.ndarray:
+    def _symmetric_transition_matrix(noise_rate: float) -> np.ndarray:
         transition_matrix = np.full((10, 10), noise_rate / (10 - 1))
         np.fill_diagonal(transition_matrix, 1.0 - noise_rate)
         return transition_matrix
 
     @staticmethod
-    def _asymmetric_transition_matrix(noise_rate) -> np.ndarray:
+    def _asymmetric_transition_matrix(noise_rate: float) -> np.ndarray:
         cifar10_asymm_label_transition = {
             9: 1,  # truck -> automobile
             2: 0,  # bird -> airplane
@@ -226,6 +226,7 @@ class NoisyCIFAR10(torchvision.datasets.CIFAR10):
             'image': img1,
             'target': target,
             'target_gt': self.targets_gt[index],
+            'index': index,
         }
         if self.transform2 is not None:
             output.update({
@@ -268,13 +269,13 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
         self._inject_label_noise(self.transition_matrix)
 
     @staticmethod
-    def _symmetric_transition_matrix(noise_rate) -> np.ndarray:
+    def _symmetric_transition_matrix(noise_rate: float) -> np.ndarray:
         transition_matrix = np.full((100, 100), noise_rate / (100 - 1))
         np.fill_diagonal(transition_matrix, 1 - noise_rate)
         return transition_matrix
 
     @staticmethod
-    def _asymmetric_transition_matrix(noise_rate) -> np.ndarray:
+    def _asymmetric_transition_matrix(noise_rate: float) -> np.ndarray:
         eye = np.eye(100, dtype=np.int32)
         transition_matrix = (1 - noise_rate) * eye + noise_rate * np.roll(eye, 1, axis=1)
         return transition_matrix
@@ -298,6 +299,7 @@ class NoisyCIFAR100(torchvision.datasets.CIFAR100):
             'image': img1,
             'target': target,
             'target_gt': self.targets_gt[index],
+            'index': index,
         }
         if self.transform2 is not None:
             output.update({

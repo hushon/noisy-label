@@ -93,7 +93,7 @@ class Clothing1M(torch.utils.data.Dataset):
         [Official Dataset Structure]
         github link: https://github.com/Cysu/noisy_label
 
-        {dataset_root}/clothing1M/
+        {root}/Clothing1M/
         ├── category_names_chn.txt
         ├── category_names_eng.txt
         ├── clean_label_kv.txt
