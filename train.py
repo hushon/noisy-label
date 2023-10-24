@@ -92,45 +92,45 @@ if __name__ == '__main__':
             config = yaml.safe_load(file)
     else:
         config = yaml.safe_load(
-        r"""
-        method: nrd_ema_instance
+        # r"""
+        # method: nrd_ema_instance
         
-        data:
-            dataset: noisy_cifar10
-            noise_type: symmetric
-            noise_rate: 0.5
+        # data:
+        #     dataset: noisy_cifar10
+        #     noise_type: symmetric
+        #     noise_rate: 0.5
         
-        model:
-            architecture: resnet18
-            num_classes: 10
+        # model:
+        #     architecture: resnet18
+        #     num_classes: 10
         
-        wandb:
-            mode: disabled # "disabled" or "online"
-            entity: hyounguk-shon
-            project: noisy-label
-            name: CIFAR10-CE-NRD-EMA-2
-            save_code: True
+        # wandb:
+        #     mode: disabled # "disabled" or "online"
+        #     entity: hyounguk-shon
+        #     project: noisy-label
+        #     name: CIFAR10-CE-NRD-EMA-2
+        #     save_code: True
         
-        trainer:
-            optimizer: sgd
-            init_lr: 0.1
-            momentum: 0.9
-            weight_decay: 1.0e-4
-            # weight_decay: 0.0
-            lr_scheduler: multistep
-            max_epoch: 200
-            num_workers: 4
-            batch_size: 128
-            save_model: False
-            loss_fn: cross_entropy
-            alpha: 0.5
-            teacher_aug: autoaugment
-            student_aug: randomcrop
-            distill_loss_fn: cross_entropy
-            temperature: 1.0
-            enable_amp: False
-            ema_beta: 0.9999
-        """
+        # trainer:
+        #     optimizer: sgd
+        #     init_lr: 0.1
+        #     momentum: 0.9
+        #     weight_decay: 1.0e-4
+        #     # weight_decay: 0.0
+        #     lr_scheduler: multistep
+        #     max_epoch: 200
+        #     num_workers: 4
+        #     batch_size: 128
+        #     save_model: False
+        #     loss_fn: cross_entropy
+        #     alpha: 0.5
+        #     teacher_aug: autoaugment
+        #     student_aug: randomcrop
+        #     distill_loss_fn: cross_entropy
+        #     temperature: 1.0
+        #     enable_amp: False
+        #     ema_beta: 0.9999
+        # """
         # r"""
         # method: vanilla
 
@@ -164,8 +164,46 @@ if __name__ == '__main__':
         #     loss_fn: cross_entropy
         #     aug: none
         #     enable_amp: false
-
         # """
+        r"""
+        method: fit_nrosd_multiple
+        
+        data:
+            dataset: noisy_cifar10
+            noise_type: symmetric
+            noise_rate: 0.5
+        
+        model:
+            architecture: resnet18
+            num_classes: 10
+        
+        wandb:
+            mode: online # "disabled" or "online"
+            entity: hyounguk-shon
+            project: noisy-label
+            name: CIFAR10-CE-NRD
+            save_code: True
+        
+        trainer:
+            optimizer: sgd
+            init_lr: 0.1
+            momentum: 0.9
+            weight_decay: 1.0e-4
+            # weight_decay: 0.0
+            lr_scheduler: multistep
+            max_epoch: 200
+            num_workers: 4
+            batch_size: 128
+            save_model: False
+            loss_fn: cross_entropy
+            alpha: 0.5
+            teacher_aug: autoaugment
+            student_aug: randomcrop
+            distill_loss_fn: cross_entropy
+            temperature: 1.0
+            enable_amp: False
+            ema_beta: 0.9999
+        """
         )
 
 
