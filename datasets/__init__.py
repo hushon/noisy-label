@@ -1,4 +1,4 @@
-from .cifar import CIFAR10, CIFAR100, NoisyCIFAR10, NoisyCIFAR100, CIFAR10N, CIFAR100N, NoisyCIFAR3, OldNoisyCIFAR10
+from .cifar import CIFAR10, CIFAR100, NoisyCIFAR10, NoisyCIFAR100, CIFAR10N, CIFAR100N, NoisyCIFAR3, OldNoisyCIFAR10, OldNoisyCIFAR100
 from .food101 import Food101
 from .animal import Animal10N
 from .clothing import Clothing1M
@@ -27,9 +27,15 @@ def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
     match dataset_name:
         case "noisy_cifar10":
             train_dataset = NoisyCIFAR10(data_root, download=True, **kwargs)
-            test_dataset = CIFAR10(data_root, train=False, download=True,)
+            test_dataset = CIFAR10(data_root, train=False, download=True)
         case "noisy_cifar100":
             train_dataset = NoisyCIFAR100(data_root, download=True, **kwargs)
+            test_dataset = CIFAR100(data_root, train=False, download=True)
+        case "old_noisy_cifar10":
+            train_dataset = OldNoisyCIFAR10(data_root, download=True, **kwargs)
+            test_dataset = CIFAR10(data_root, train=False, download=True)
+        case "old_noisy_cifar100":
+            train_dataset = OldNoisyCIFAR100(data_root, download=True, **kwargs)
             test_dataset = CIFAR100(data_root, train=False, download=True)
         case "noisy_cifar3":
             train_dataset = NoisyCIFAR3(data_root, train=True, download=True, **kwargs)
@@ -110,7 +116,7 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
     dataset_type = type(dataset)
     match op_name:
         case "none":
-            if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N]:
+            if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N, OldNoisyCIFAR10, OldNoisyCIFAR100]:
                 return nn.Sequential(
                     transforms_v2.ToImageTensor(),
                 )
@@ -128,7 +134,7 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
             else:
                 raise NotImplementedError(dataset_type)
         case "randomcrop":
-            if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N]:
+            if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N, OldNoisyCIFAR10, OldNoisyCIFAR100]:
                 return nn.Sequential(
                     transforms_v2.RandomCrop(32, padding=4),
                     transforms_v2.RandomHorizontalFlip(),
@@ -151,7 +157,7 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
             else:
                 raise NotImplementedError(dataset_type)
         case "autoaugment":
-            if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N]:
+            if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N, OldNoisyCIFAR10, OldNoisyCIFAR100]:
                 return nn.Sequential(
                     transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
                     transforms_v2.ToImageTensor(),
@@ -166,7 +172,7 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
             else:
                 raise NotImplementedError(dataset_type)
         case "gaussianblur":
-            if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N]:
+            if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N, OldNoisyCIFAR10, OldNoisyCIFAR100]:
                 return nn.Sequential(
                     transforms_v2.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0)),
                     transforms_v2.RandomHorizontalFlip(),
@@ -175,7 +181,7 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
             else:
                 raise NotImplementedError(dataset_type)
         case "sharpen":
-            if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N]:
+            if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N, OldNoisyCIFAR10, OldNoisyCIFAR100]:
                 return nn.Sequential(
                     transforms_v2.RandomAdjustSharpness(sharpness_factor=2.0, p=0.5),
                     transforms_v2.RandomHorizontalFlip(),
@@ -184,7 +190,7 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
             else:
                 raise NotImplementedError(dataset_type)
         case "rotate":
-            if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N]:
+            if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N, OldNoisyCIFAR10, OldNoisyCIFAR100]:
                 return nn.Sequential(
                     transforms_v2.RandomRotation(degrees=15),
                     transforms_v2.RandomHorizontalFlip(),
@@ -193,7 +199,7 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
             else:
                 raise NotImplementedError(dataset_type)
         case "colorjitter":
-            if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N]:
+            if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N, OldNoisyCIFAR10, OldNoisyCIFAR100]:
                 return nn.Sequential(
                     transforms_v2.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
                     transforms_v2.RandomHorizontalFlip(),
@@ -207,9 +213,9 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
 
 def get_normalization(dataset: Dataset):
     dataset_type = type(dataset)
-    if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N]:
+    if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, OldNoisyCIFAR10]:
         mean, std = CIFAR10_MEAN_STD
-    elif dataset_type in [CIFAR100, NoisyCIFAR100, CIFAR100N]:
+    elif dataset_type in [CIFAR100, NoisyCIFAR100, CIFAR100N, OldNoisyCIFAR100]:
         mean, std = CIFAR100_MEAN_STD
     elif dataset_type in [Clothing1M, WebVisionV1]:
         mean, std = IMAGENET_MEAN_STD

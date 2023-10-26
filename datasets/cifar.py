@@ -51,7 +51,6 @@ class CIFAR10(torchvision.datasets.CIFAR10):
         return output
 
 
-
 class CIFAR100(torchvision.datasets.CIFAR100):
     def __init__(
         self,
@@ -86,7 +85,7 @@ class CIFAR100(torchvision.datasets.CIFAR100):
         return output
 
 
-class OldNoisyCIFAR10(torchvision.datasets.CIFAR10):
+class OldNoisyCIFAR10(CIFAR10):
     """CIFAR-10 Dataset with synthetic label noise."""
     num_classes = 10
     asymm_label_transition = {
@@ -106,7 +105,7 @@ class OldNoisyCIFAR10(torchvision.datasets.CIFAR10):
             download: bool = False,
             noise_rate : float = 0.2,
             noise_type : str = "symmetric",
-            random_state: int = 42,
+            random_seed: int = 42,
         ) -> None:
         super().__init__(root, train=train, transform=transform,
             target_transform=target_transform, download=download)
@@ -117,8 +116,7 @@ class OldNoisyCIFAR10(torchvision.datasets.CIFAR10):
         self.data = np.array(self.data)
         self.targets = np.array(self.targets)
         self.noise_rate = noise_rate
-        self.random_state = random_state
-        self.rng = np.random.default_rng(self.random_state)
+        self.rng = np.random.default_rng(random_seed)
 
         if noise_type == "symmetric":
             self._inject_symmetric_noise()
@@ -137,23 +135,124 @@ class OldNoisyCIFAR10(torchvision.datasets.CIFAR10):
         self.targets[target_mask] = self.rng.integers(0, self.num_classes,
                                                     size=num_noisy_samples)
 
+    # def _inject_asymmetric_noise(self):
+    #     self.targets_gt = self.targets.copy()
+    #     num_noisy_samples = int(self.noise_rate * len(self))
+    #     target_mask = np.full_like(self.targets, False, dtype=bool)
+    #     target_mask[:num_noisy_samples] = True
+    #     self.rng.shuffle(target_mask)
+    #     # change labels
+    #     for gt, tgt in self.asymm_label_transition.items():
+    #         self.targets[target_mask & (self.targets == gt)] = tgt
+
     def _inject_asymmetric_noise(self):
         self.targets_gt = self.targets.copy()
-        num_noisy_samples = int(self.noise_rate * len(self))
-        target_mask = np.full_like(self.targets, False, dtype=bool)
-        target_mask[:num_noisy_samples] = True
-        target_mask = self.rng.shuffle(target_mask)
-        # change labels
-        for gt, tgt in self.asymm_label_transition.items():
-            self.targets[target_mask & (self.targets == gt)] = tgt
+        for i in range(10):
+            indices = np.where(self.targets == i)[0]
+            self.rng.shuffle(indices)
+            for j, idx in enumerate(indices):
+                if j < self.noise_rate * len(indices):
+                    # truck -> automobile
+                    if i == 9:
+                        self.targets[idx] = 1
+                    # bird -> airplane
+                    elif i == 2:
+                        self.targets[idx] = 0
+                    # cat -> dog
+                    elif i == 3:
+                        self.targets[idx] = 5
+                    # dog -> cat
+                    elif i == 5:
+                        self.targets[idx] = 3
+                    # deer -> horse
+                    elif i == 4:
+                        self.targets[idx] = 7
 
-    def __getitem__(self, index):
-        img, target = super().__getitem__(index)
-        return {
-            'image': img,
-            'target': target,
-            'target_gt': self.targets_gt[index],
-        }
+
+class OldNoisyCIFAR100(CIFAR100):
+    """
+    CIFAR-100 Dataset with synthetic label noise.
+    Code from GJS
+    """
+
+    def __init__(
+            self,
+            root: str,
+            train: bool = True,
+            transform = None,
+            transform2 = None,
+            target_transform = None,
+            download: bool = False,
+            noise_rate: float = 0.2,
+            noise_type: str = "symmetric",
+            random_seed: int = 42,
+        ) -> None:
+        super().__init__(root, train=train, transform=transform,
+            target_transform=target_transform, download=download)
+        assert self.train == True
+        assert 0.0 <= noise_rate <= 1.0
+        assert noise_type in ["symmetric", "asymmetric"]
+
+        self.transform2 = transform2
+        self.data = np.array(self.data)
+        self.targets = np.array(self.targets)
+        self.noise_rate = noise_rate
+        self.rng = np.random.default_rng(random_seed)
+
+        if noise_type == "symmetric":
+            self._inject_symmetric_noise()
+        elif noise_type == "asymmetric":
+            self._inject_asymmetric_noise()
+
+        true_noise_rate = (self.targets != self.targets_gt).mean()
+        print(f"True noise rate: {true_noise_rate:.4f}")
+
+    def _inject_symmetric_noise(self):
+        self.targets_gt = self.targets.copy()
+        indices = self.rng.permutation(len(self.data))
+        for i, idx in enumerate(indices):
+            if i < self.noise_rate * len(self.data):
+                self.targets[idx] = np.random.randint(100, dtype=np.int32)
+
+    def _inject_asymmetric_noise(self):
+        self.targets_gt = self.targets.copy()
+        with open('datasets/c100_supertosub.txt', 'r') as f: 
+            content = f.read()
+            superclass_to_subclasses = eval(content)
+        with open('datasets/c100_subtosuper.txt', 'r') as f: 
+            content = f.read()
+            subclass_to_superclass = eval(content)
+
+        indices = self.rng.permutation(len(self.data))
+        for i, idx in enumerate(indices):
+            if i < self.noise_rate * len(self.data):
+                target = self.targets[idx]
+                target_name = self.classes[target]
+                superclass_name = subclass_to_superclass[target_name]
+                subclasses = superclass_to_subclasses[superclass_name]
+
+                # Old way
+                #other_subclasses = np.setdiff1d(subclasses, target_name)
+                #index = np.random.randint(0, 4)
+                #target_new_name = other_subclasses[index]
+                #target_new = self.class_to_idx[target_new_name]
+                #self.targets_noisy[idx] = target_new
+
+                # New way
+                index = (subclasses.index(target_name) + 1) % 5
+                target_new_name = subclasses[index]
+                target_new = self.class_to_idx[target_new_name]
+                self.targets[idx] = target_new
+                """
+                subclasses_targets = [self.class_to_idx[e] for e in subclasses]
+                print("---")
+                print("Superclass name:", superclass_name)
+                print("Subclass names:", subclasses)
+                print("Subclass targets:", subclasses_targets)
+                print("True target name:", target_name, target)
+                print("New target name:", target_new_name, target_new)
+                print("---")
+                """
 
 
 class NoisyCIFAR10(torchvision.datasets.CIFAR10):
@@ -495,3 +594,8 @@ class NoisyCIFAR3(torchvision.datasets.CIFAR10):
             'target': target,
             'target_gt': self.targets_gt[index] if self.train else target,
         }
+
+
+if __name__ == "__main__":
+    dataset = NoisyCIFAR10(root='/dev/shm/data/', train=True, download=True, noise_type='asymmetric', noise_rate=0.2)
+    dataset = OldNoisyCIFAR10(root='/dev/shm/data/', train=True, download=True, noise_type='asymmetric', noise_rate=0.2)

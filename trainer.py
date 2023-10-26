@@ -740,6 +740,97 @@ class Trainer:
         self.wandb_run.log_artifact(artifact)
 
 
+    def fit_nrosd_ema_instance_multiple(self, train_dataset: Dataset, val_dataset: Dataset):
+
+        # train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
+        # train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+        train_dataset.transform = datasets.get_transform('none', train_dataset)
+        train_dataset.transform2 = datasets.get_transform('none', train_dataset)
+        transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
+        transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+
+        val_dataset.transform = datasets.get_transform('none', val_dataset)
+
+        train_dataloader = self.get_dataloader(train_dataset, train=True)
+        val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        tabular_ema = TabularEMA(
+            num_samples=len(train_dataset),
+            num_classes=self.model.fc.out_features,
+            beta=self.config['ema_beta'],
+        ).to(self.device)
+
+        self.criterion = self.get_loss_fn(self.config["loss_fn"]).to(self.device)
+        optimizer = self.get_optimizer(self.model)
+        lr_scheduler = self.get_lr_scheduler(optimizer)
+        grad_scaler = torch.cuda.amp.GradScaler(enabled=self.config["enable_amp"])
+        # artifact = wandb.Artifact(f'checkpoints_{self.wandb_run.id}',
+        artifact = wandb.Artifact(
+            'checkpoints',
+            type='model',
+            metadata=self.wandb_run.config['model']
+        )
+
+        distill_criterion = self.get_distill_loss_fn(
+            self.config["distill_loss_fn"],
+            self.config['temperature']
+        ).to(self.device)
+        alpha = self.config['alpha']
+
+        normalize = datasets.get_normalization(train_dataset).to(self.device)
+
+        for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
+            train_stats = AverageMeter()
+            self.model.train()
+            for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
+                target, target_gt = batch["target"].to(self.device), batch["target_gt"].to(self.device)
+                data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
+                data, data2 = transform1(data), torch.stack([transform2(data2) for _ in range(10)], dim=0)
+                b = data.shape[0]
+                data2 = data2.view(-1, *data2.shape[2:])
+                data, data2 = transform1(data), transform2(data2)
+                data, data2 = normalize(data), normalize(data2)
+                indices = batch['index'].to(self.device)
+                with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
+                    output = self.model(data)
+                    with torch.no_grad():
+                        output_teacher = self.model(data2)
+                        output_teacher = output_teacher.view(10, b, *output_teacher.shape[1:]).mean(0)
+                        # output_teacher = tabular_ema(output_teacher, indices)
+                        output_teacher = tabular_ema(output_teacher.softmax(-1), indices).log()
+                    target_loss = self.criterion(output, target).mean()
+                    distill_loss = distill_criterion(output, output_teacher).mean()
+                    loss = target_loss * alpha + distill_loss * (1.0-alpha)
+                optimizer.zero_grad()
+                grad_scaler.scale(loss).backward()
+                grad_scaler.step(optimizer)
+                grad_scaler.update()
+                train_stats.update(
+                    target.size(0),
+                    loss=loss.detach(),
+                    t1acc=calculate_accuracy(output, target),
+                    t5acc=calculate_accuracy(output, target, k=5),
+                    target_loss=target_loss.detach(),
+                    distill_loss=distill_loss.detach()
+                )
+            lr_scheduler.step()
+
+            train_stats = train_stats.get_average()
+            val_stats = self._evaluate(val_dataloader)
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
+            self.wandb_run.log(
+                {
+                    "learning_rate": lr_scheduler.get_last_lr()[0],
+                    **{'train_'+k: v for k, v in train_stats.items()},
+                    **{'val_'+k: v for k, v in val_stats.items()},
+                }
+            )
+            if self.config["save_model"] and (epoch+1)%10 == 0:
+                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
+                torch.save(self.model.state_dict(), filepath)
+                print(f"SAVED MODEL")
+                # artifact.add_file(filepath)
+        self.wandb_run.log_artifact(artifact)
 
 
     def distill(self, train_dataset: Dataset, val_dataset: Dataset, teacher_model: nn.Module):
