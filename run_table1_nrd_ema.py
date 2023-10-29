@@ -49,7 +49,7 @@ if __name__ == '__main__':
     # method: fit_nrosd_ema_multiple
     
     # data:
-    #     dataset: noisy_cifar10
+    #     dataset: old_noisy_cifar10
     #     noise_type: symmetric
     #     noise_rate: 0.5
     

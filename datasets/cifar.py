@@ -44,10 +44,10 @@ class CIFAR10(torchvision.datasets.CIFAR10):
             'image': img1,
             'target': target,
         }
+        if hasattr(self, 'targets_gt'):
+            output.update({'target_gt': self.targets_gt[index]})
         if self.transform2 is not None:
-            output.update({
-                'image2': self.transform2(img),
-            })
+            output.update({'image2': self.transform2(img)})
         return output
 
 
@@ -78,15 +78,18 @@ class CIFAR100(torchvision.datasets.CIFAR100):
             'image': img1,
             'target': target,
         }
+        if hasattr(self, 'targets_gt'):
+            output.update({'target_gt': self.targets_gt[index]})
         if self.transform2 is not None:
-            output.update({
-                'image2': self.transform2(img),
-            })
+            output.update({'image2': self.transform2(img)})
         return output
 
 
 class OldNoisyCIFAR10(CIFAR10):
-    """CIFAR-10 Dataset with synthetic label noise."""
+    """
+    CIFAR-10 Dataset with synthetic label noise.
+    Code from GJS
+    """
     num_classes = 10
     asymm_label_transition = {
         9: 1,  # truck -> automobile

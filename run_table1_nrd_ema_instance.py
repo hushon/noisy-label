@@ -11,7 +11,7 @@ if __name__ == '__main__':
     # method: fit_nrosd_ema_instance
     
     # data:
-    #     dataset: noisy_cifar10
+    #     dataset: old_noisy_cifar10
     #     noise_type: symmetric
     #     noise_rate: 0.5
     
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     method: fit_nrosd_ema_instance_multiple
     
     data:
-        dataset: noisy_cifar10
+        dataset: old_noisy_cifar10
         noise_type: symmetric
         noise_rate: 0.5
     
@@ -70,7 +70,7 @@ if __name__ == '__main__':
         momentum: 0.9
         weight_decay: 1.0e-4
         lr_scheduler: multistep
-        max_epoch: 200
+        max_epoch: 2000
         num_workers: 4
         batch_size: 128
         save_model: False
@@ -81,7 +81,7 @@ if __name__ == '__main__':
         distill_loss_fn: cross_entropy
         temperature: 1.0
         enable_amp: False
-        ema_beta: 0.9999
+        ema_beta: 0.999
     """
     )
 
@@ -98,9 +98,13 @@ if __name__ == '__main__':
         # for ema_beta in [0.999, 0.9995, 0.9999, 0.99995, 0.99999, 0.999995, 0.999999]:
         # config['trainer']['lr_scheduler'] = 'cosine'
         # config['trainer']['max_epoch'] = 1000
-        for ema_beta in [0.5, 0.6, 0.7, 0.8, 0.9, 0.99, 0.999, 0.9995, 0.9999]:
-            config['trainer']['ema_beta'] = ema_beta
-            config['wandb']['name'] = f'CIFAR10-CE-NRD-EMA-instance-{ema_beta}'
+        # for ema_beta in [0.5, 0.6, 0.7, 0.8, 0.9, 0.99, 0.999, 0.9995, 0.9999]:
+        #     config['trainer']['ema_beta'] = ema_beta
+        #     config['wandb']['name'] = f'CIFAR10-CE-NRD-EMA-instance-{ema_beta}'
+        #     executor.submit(main, deepcopy(config))
+        for alpha in [0.0, 0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99, 1.0]:
+            config['trainer']['alpha'] = alpha
+            config['wandb']['name'] = f'CIFAR10-CE-NRD-EMA-instance-{alpha}'
             executor.submit(main, deepcopy(config))
 
 
