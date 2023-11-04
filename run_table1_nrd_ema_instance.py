@@ -16,7 +16,7 @@ if __name__ == '__main__':
     #     noise_rate: 0.5
     
     # model:
-    #     architecture: resnet18
+    #     architecture: resnet34
     #     num_classes: 10
     
     # wandb:
@@ -54,7 +54,7 @@ if __name__ == '__main__':
         noise_rate: 0.5
     
     model:
-        architecture: resnet18
+        architecture: resnet34
         num_classes: 10
     
     wandb:

@@ -54,11 +54,11 @@ def main(config: dict):
 
     model = get_model(**config["model"])
     trainer = Trainer(
-                    model=model,
-                    config=config['trainer'],
-                    wandb_run=wandb_run,
-                    device=device,
-                    )
+        model=model,
+        config=config['trainer'],
+        wandb_run=wandb_run,
+        device=device,
+    )
 
     train_dataset, test_dataset = get_dataset(**config["data"])
 

@@ -122,7 +122,7 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
                 )
             elif dataset_type in [Clothing1M, WebVisionV1]:
                 return nn.Sequential(
-                    transforms_v2.Resize(256),
+                    transforms_v2.Resize(256, antialias=True),
                     transforms_v2.CenterCrop(224),
                     transforms_v2.ToImageTensor(),
                 )
@@ -142,7 +142,7 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
                 )
             elif dataset_type in [Clothing1M, WebVisionV1]:
                 return nn.Sequential(
-                    transforms_v2.Resize(256),
+                    transforms_v2.Resize(256, antialias=True),
                     transforms_v2.RandomCrop(224),
                     transforms_v2.RandomHorizontalFlip(),
                     transforms_v2.ToImageTensor(),
@@ -164,7 +164,7 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
                 )
             elif dataset_type in [Clothing1M, WebVisionV1]:
                 return nn.Sequential(
-                    transforms_v2.Resize(256),
+                    transforms_v2.Resize(256, antialias=True),
                     transforms_v2.CenterCrop(224),
                     transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
                     transforms_v2.ToImageTensor(),

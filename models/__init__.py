@@ -37,6 +37,8 @@ def get_model(architecture, num_classes, pretrained=False) -> nn.Module:
         case "resnet152_torchvision":
             model = torchvision.models.resnet152(weights=torchvision.models.ResNet152_Weights.IMAGENET1K_V1 if pretrained else None)
             model.fc = nn.Linear(2048, num_classes)
+        case "resnet34_dropout":
+            model = resnet.resnet34(pretrained=False, in_channels=3, num_classes=num_classes, dropout=nn.Dropout(0.5))
         case _:
             raise NotImplementedError
     return model
