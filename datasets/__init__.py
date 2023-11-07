@@ -21,7 +21,10 @@ IMAGENET_MEAN_STD = ((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
 
 
 def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
-    data_root = "/dev/shm/data"
+    if 'root' in kwargs:
+        data_root = kwargs.pop('root')
+    else:
+        data_root = "/dev/shm/data"
     dataset_name = kwargs.pop('dataset')
 
     match dataset_name:
