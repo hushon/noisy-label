@@ -24,7 +24,7 @@ def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
     if 'root' in kwargs:
         data_root = kwargs.pop('root')
     else:
-        data_root = "/dev/shm/data"
+        data_root = "/dev/shm/data/"
     dataset_name = kwargs.pop('dataset')
 
     match dataset_name:
@@ -56,52 +56,6 @@ def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
             train_dataset = Animal10N(data_root, train=True, download=True, **kwargs)
             test_dataset = Animal10N(data_root, train=False, download=True)
         case "webvision":
-            # transform_train = transforms.Compose([ # dividemix style
-            #     transforms.Resize(320),
-            #     transforms.RandomResizedCrop(299),
-            #     transforms.RandomHorizontalFlip(),
-            #     transforms.ToTensor(),
-            #     transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
-            #     ])
-            # transform_test = transforms.Compose([
-            #     transforms.Resize(320),
-            #     transforms.CenterCrop(299),
-            #     transforms.ToTensor(),
-            #     transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
-            #     ])
-            # transform_train = transforms.Compose([ # normalized loss style
-            #     transforms.RandomResizedCrop(224),
-            #     transforms.RandomHorizontalFlip(),
-            #     transforms.ColorJitter(brightness=0.4,
-            #                             contrast=0.4,
-            #                             saturation=0.4,
-            #                             hue=0.2),
-            #     transforms.ToTensor(),
-            #     transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
-            #     ])
-            # transform_test = transforms.Compose([
-            #     transforms.Resize(256),
-            #     transforms.CenterCrop(224),
-            #     transforms.ToTensor(),
-            #     transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
-            #     ])
-            # transform_train = transforms.Compose([ # ELR style
-            #     transforms.RandomCrop(227),
-            #     transforms.RandomHorizontalFlip(),
-            #     transforms.ToTensor(),
-            #     transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
-            # ])
-            # transform_test = transforms.Compose([
-            #     transforms.CenterCrop(227),
-            #     transforms.ToTensor(),
-            #     transforms.Normalize((0.485, 0.456, 0.406),(0.229, 0.224, 0.225)),
-            # ])
-            # transform_imagenet = transforms.Compose([
-            #     transforms.Resize(256),
-            #     transforms.CenterCrop(227),
-            #     transforms.ToTensor(),
-            #     transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
-            # ])
             train_dataset = WebVisionV1(data_root, split='train', num_classes=50, **kwargs)
             test_dataset = WebVisionV1(data_root, split='val', num_classes=50)
         case "cifar10":

@@ -309,12 +309,14 @@ class Trainer:
         self.wandb_run.log_artifact(artifact)
 
     def fit_nrosd(self, train_dataset: Dataset, val_dataset: Dataset):
-        # train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
-        # train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
-        train_dataset.transform = datasets.get_transform('none', train_dataset)
-        train_dataset.transform2 = datasets.get_transform('none', train_dataset)
-        transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
-        transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+        if self.config['transform_after_batching']:
+            train_dataset.transform = datasets.get_transform('none', train_dataset)
+            train_dataset.transform2 = datasets.get_transform('none', train_dataset)
+            transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
+            transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+        else:
+            train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
+            train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
 
         val_dataset.transform = datasets.get_transform('none', val_dataset)
 
@@ -346,7 +348,8 @@ class Trainer:
             for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
                 target = batch["target"].to(self.device)
                 data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
-                data, data2 = transform1(data), transform2(data2)
+                if self.config['transform_after_batching']:
+                    data, data2 = transform1(data), transform2(data2)
                 data, data2 = normalize(data), normalize(data2)
                 with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
                     # self.model.train()
@@ -398,12 +401,14 @@ class Trainer:
         ).train()
         # ema_model = EMA(self.model).eval()
 
-        # train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
-        # train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
-        train_dataset.transform = datasets.get_transform('none', train_dataset)
-        train_dataset.transform2 = datasets.get_transform('none', train_dataset)
-        transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
-        transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+        if self.config['transform_after_batching']:
+            train_dataset.transform = datasets.get_transform('none', train_dataset)
+            train_dataset.transform2 = datasets.get_transform('none', train_dataset)
+            transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
+            transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+        else:
+            train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
+            train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
 
         val_dataset.transform = datasets.get_transform('none', val_dataset)
 
@@ -435,7 +440,8 @@ class Trainer:
             for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
                 target = batch["target"].to(self.device)
                 data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
-                data, data2 = transform1(data), transform2(data2)
+                if self.config['transform_after_batching']:
+                    data, data2 = transform1(data), transform2(data2)
                 data, data2 = normalize(data), normalize(data2)
                 with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
                     output = self.model(data)
@@ -479,12 +485,14 @@ class Trainer:
 
     def fit_nrosd_ema_instance(self, train_dataset: Dataset, val_dataset: Dataset):
 
-        # train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
-        # train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
-        train_dataset.transform = datasets.get_transform('none', train_dataset)
-        train_dataset.transform2 = datasets.get_transform('none', train_dataset)
-        transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
-        transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+        if self.config['transform_after_batching']:
+            train_dataset.transform = datasets.get_transform('none', train_dataset)
+            train_dataset.transform2 = datasets.get_transform('none', train_dataset)
+            transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
+            transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+        else:
+            train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
+            train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
 
         val_dataset.transform = datasets.get_transform('none', val_dataset)
 
@@ -522,7 +530,8 @@ class Trainer:
             for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
                 target, target_gt = batch["target"].to(self.device), batch["target_gt"].to(self.device)
                 data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
-                data, data2 = transform1(data), transform2(data2)
+                if self.config['transform_after_batching']:
+                    data, data2 = transform1(data), transform2(data2)
                 data, data2 = normalize(data), normalize(data2)
                 indices = batch['index'].to(self.device)
                 with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
@@ -567,12 +576,14 @@ class Trainer:
 
 
     def fit_nrosd_multiple(self, train_dataset: Dataset, val_dataset: Dataset):
-        # train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
-        # train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
-        train_dataset.transform = datasets.get_transform('none', train_dataset)
-        train_dataset.transform2 = datasets.get_transform('none', train_dataset)
-        transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
-        transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+        if self.config['transform_after_batching']:
+            train_dataset.transform = datasets.get_transform('none', train_dataset)
+            train_dataset.transform2 = datasets.get_transform('none', train_dataset)
+            transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
+            transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+        else:
+            train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
+            train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
 
         val_dataset.transform = datasets.get_transform('none', val_dataset)
 
@@ -604,7 +615,10 @@ class Trainer:
             for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
                 target = batch["target"].to(self.device)
                 data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
-                data, data2 = transform1(data), torch.stack([transform2(data2) for _ in range(10)], dim=0)
+                if self.config['transform_after_batching']:
+                    data, data2 = transform1(data), torch.stack([transform2(data2) for _ in range(10)], dim=0)
+                else:
+                    raise NotImplementedError
                 # b = data.shape[0]
                 # data2 = data2.view(-1, *data2.shape[2:])
                 data2 = einops.rearrange(data2, 'n b c h w -> (n b) c h w')
@@ -661,12 +675,14 @@ class Trainer:
         ).train()
         # ema_model = EMA(self.model).eval()
 
-        # train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
-        # train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
-        train_dataset.transform = datasets.get_transform('none', train_dataset)
-        train_dataset.transform2 = datasets.get_transform('none', train_dataset)
-        transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
-        transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+        if self.config['transform_after_batching']:
+            train_dataset.transform = datasets.get_transform('none', train_dataset)
+            train_dataset.transform2 = datasets.get_transform('none', train_dataset)
+            transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
+            transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+        else:
+            train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
+            train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
 
         val_dataset.transform = datasets.get_transform('none', val_dataset)
 
@@ -699,7 +715,10 @@ class Trainer:
             for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
                 target = batch["target"].to(self.device)
                 data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
-                data, data2 = transform1(data), torch.stack([transform2(data2) for _ in range(n_views)], dim=0)
+                if self.config['transform_after_batching']:
+                    data, data2 = transform1(data), torch.stack([transform2(data2) for _ in range(n_views)], dim=0)
+                else:
+                    raise NotImplementedError
                 # b = data.shape[0]
                 # data2 = data2.view(-1, *data2.shape[2:])
                 data2 = einops.rearrange(data2, 'n b c h w -> (n b) c h w')
@@ -748,12 +767,14 @@ class Trainer:
 
     def fit_nrosd_ema_instance_multiple(self, train_dataset: Dataset, val_dataset: Dataset):
 
-        # train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
-        # train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
-        train_dataset.transform = datasets.get_transform('none', train_dataset)
-        train_dataset.transform2 = datasets.get_transform('none', train_dataset)
-        transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
-        transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+        if self.config['transform_after_batching']:
+            train_dataset.transform = datasets.get_transform('none', train_dataset)
+            train_dataset.transform2 = datasets.get_transform('none', train_dataset)
+            transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
+            transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+        else:
+            train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
+            train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
 
         val_dataset.transform = datasets.get_transform('none', val_dataset)
 
@@ -791,7 +812,10 @@ class Trainer:
             for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
                 target, target_gt = batch["target"].to(self.device), batch["target_gt"].to(self.device)
                 data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
-                data, data2 = transform1(data), torch.stack([transform2(data2) for _ in range(10)], dim=0)
+                if self.config['transform_after_batching']:
+                    data, data2 = transform1(data), torch.stack([transform2(data2) for _ in range(10)], dim=0)
+                else:
+                    raise NotImplementedError
                 # b = data.shape[0]
                 # data2 = data2.view(-1, *data2.shape[2:])
                 data2 = einops.rearrange(data2, 'n b c h w -> (n b) c h w')
@@ -851,12 +875,14 @@ class Trainer:
         ).train()
         # ema_model = EMA(self.model).eval()
 
-        # train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
-        # train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
-        train_dataset.transform = datasets.get_transform('none', train_dataset)
-        train_dataset.transform2 = datasets.get_transform('none', train_dataset)
-        transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
-        transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+        if self.config['transform_after_batching']:
+            train_dataset.transform = datasets.get_transform('none', train_dataset)
+            train_dataset.transform2 = datasets.get_transform('none', train_dataset)
+            transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
+            transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+        else:
+            train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
+            train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
 
         val_dataset.transform = datasets.get_transform('none', val_dataset)
 
@@ -888,7 +914,8 @@ class Trainer:
             for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
                 target = batch["target"].to(self.device)
                 data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
-                data, data2 = transform1(data), transform2(data2)
+                if self.config['transform_after_batching']:
+                    data, data2 = transform1(data), transform2(data2)
                 data, data2 = normalize(data), normalize(data2)
                 with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
                     output = self.model(data)

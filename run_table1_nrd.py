@@ -43,6 +43,7 @@ if __name__ == '__main__':
         distill_loss_fn: cross_entropy
         temperature: 1.0
         enable_amp: False
+        transform_after_batching: false
     """
     # r"""
     # method: fit_nrosd_multiple

@@ -44,6 +44,7 @@ if __name__ == '__main__':
         temperature: 1.0
         enable_amp: False
         ema_beta: 0.9995
+        transform_after_batching: false
     """
     # r"""
     # method: fit_nrosd_ema_multiple
@@ -83,6 +84,7 @@ if __name__ == '__main__':
     #     enable_amp: False
     #     ema_beta: 0.9995
     #     n_views: 10
+        # transform_after_batching: false
     # """
     )
 

@@ -43,6 +43,7 @@ if __name__ == '__main__':
         temperature: 1.0
         enable_amp: true
         ema_beta: 0.9995
+        transform_after_batching: false
     """
     # r""" ## Clothing1M 실험은 20시간정도 소요
     # method: fit_nrosd_ema
@@ -80,6 +81,7 @@ if __name__ == '__main__':
     #     temperature: 1.0
     #     enable_amp: true
     #     ema_beta: 0.9995
+        # transform_after_batching: false
     # """
     )
 
