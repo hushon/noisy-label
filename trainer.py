@@ -284,7 +284,7 @@ class Trainer:
                 target = batch["target"].to(self.device)
                 data = batch["image"].to(self.device)
                 if self.config['transform_after_batching']:
-                    data, = transform(data)
+                    data = transform(data)
                 data = normalize(data)
                 with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
                     output = self.model(data)
