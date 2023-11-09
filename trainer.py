@@ -302,9 +302,9 @@ class Trainer:
 
             lr_scheduler.step()
             train_stats = train_stats.get_average()
+            val_stats = self._evaluate(val_dataloader)
             if val_stats['t1acc'] > val_t1acc_best: # update best t1acc
                 val_t1acc_best = val_stats['t1acc']
-            val_stats = self._evaluate(val_dataloader)
             tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
             self.wandb_run.log(
                 {
