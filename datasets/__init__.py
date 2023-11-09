@@ -25,24 +25,26 @@ def get_dataset(**kwargs) -> Tuple[Dataset, Dataset]:
         data_root = kwargs.pop('root')
     else:
         data_root = "/dev/shm/data/"
+    if 'random_seed' in kwargs:
+        random_seed = kwargs.pop('random_seed')
     dataset_name = kwargs.pop('dataset')
 
     match dataset_name:
         case "noisy_cifar10":
-            train_dataset = NoisyCIFAR10(data_root, download=True, **kwargs)
+            train_dataset = NoisyCIFAR10(data_root, download=True, random_seed=random_seed, **kwargs)
             test_dataset = CIFAR10(data_root, train=False, download=True)
         case "noisy_cifar100":
-            train_dataset = NoisyCIFAR100(data_root, download=True, **kwargs)
+            train_dataset = NoisyCIFAR100(data_root, download=True, random_seed=random_seed, **kwargs)
             test_dataset = CIFAR100(data_root, train=False, download=True)
         case "old_noisy_cifar10":
-            train_dataset = OldNoisyCIFAR10(data_root, download=True, **kwargs)
+            train_dataset = OldNoisyCIFAR10(data_root, download=True, random_seed=random_seed, **kwargs)
             test_dataset = CIFAR10(data_root, train=False, download=True)
         case "old_noisy_cifar100":
-            train_dataset = OldNoisyCIFAR100(data_root, download=True, **kwargs)
+            train_dataset = OldNoisyCIFAR100(data_root, download=True, random_seed=random_seed, **kwargs)
             test_dataset = CIFAR100(data_root, train=False, download=True)
         case "noisy_cifar3":
-            train_dataset = NoisyCIFAR3(data_root, train=True, download=True, **kwargs)
-            test_dataset = NoisyCIFAR3(data_root, train=False, download=True, **kwargs)
+            train_dataset = NoisyCIFAR3(data_root, train=True, download=True, random_seed=random_seed, **kwargs)
+            test_dataset = NoisyCIFAR3(data_root, train=False, download=True, random_seed=random_seed, **kwargs)
         case "clothing1m":
             train_dataset = Clothing1M(data_root, split='noisy_train', **kwargs)
             test_dataset = Clothing1M(data_root, split='clean_test', **kwargs)

@@ -252,7 +252,13 @@ class Trainer:
         )
 
     def fit(self, train_dataset: Dataset, val_dataset: Dataset):
-        train_dataset.transform = self.get_transform(self.config['aug'], train_dataset)
+        if self.config['transform_after_batching']:
+            train_dataset.transform = datasets.get_transform('none', train_dataset)
+            transform = datasets.get_transform(self.config['aug'], train_dataset)
+        else:
+            train_dataset.transform = datasets.get_transform(self.config['aug'], train_dataset)
+
+        val_dataset.transform = datasets.get_transform('none', val_dataset)
 
         train_dataloader = self.get_dataloader(train_dataset, train=True)
         val_dataloader = self.get_dataloader(val_dataset, train=False)
@@ -269,12 +275,16 @@ class Trainer:
 
         normalize = datasets.get_normalization(train_dataset).to(self.device)
 
+        val_t1acc_best = 0.0
+
         for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
             train_stats = AverageMeter()
             self.model.train()
             for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
                 target = batch["target"].to(self.device)
                 data = batch["image"].to(self.device)
+                if self.config['transform_after_batching']:
+                    data, = transform(data)
                 data = normalize(data)
                 with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
                     output = self.model(data)
@@ -292,7 +302,8 @@ class Trainer:
 
             lr_scheduler.step()
             train_stats = train_stats.get_average()
-
+            if val_stats['t1acc'] > val_t1acc_best: # update best t1acc
+                val_t1acc_best = val_stats['t1acc']
             val_stats = self._evaluate(val_dataloader)
             tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
             self.wandb_run.log(
@@ -300,6 +311,7 @@ class Trainer:
                     "learning_rate": lr_scheduler.get_last_lr()[0],
                     **{'train_'+k: v for k, v in train_stats.items()},
                     **{'val_'+k: v for k, v in val_stats.items()},
+                    'val_t1acc_best': val_t1acc_best,
                 }
             )
             if self.config["save_model"] and (epoch+1)%10 == 0:
@@ -342,6 +354,8 @@ class Trainer:
 
         normalize = datasets.get_normalization(train_dataset).to(self.device)
 
+        val_t1acc_best = 0.0
+
         for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
             train_stats = AverageMeter()
             self.model.train()
@@ -376,12 +390,15 @@ class Trainer:
 
             train_stats = train_stats.get_average()
             val_stats = self._evaluate(val_dataloader)
+            if val_stats['t1acc'] > val_t1acc_best: # update best t1acc
+                val_t1acc_best = val_stats['t1acc']
             tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
             self.wandb_run.log(
                 {
                     "learning_rate": lr_scheduler.get_last_lr()[0],
                     **{'train_'+k: v for k, v in train_stats.items()},
                     **{'val_'+k: v for k, v in val_stats.items()},
+                    'val_t1acc_best': val_t1acc_best,
                 }
             )
             if self.config["save_model"] and (epoch+1)%10 == 0:
@@ -434,6 +451,8 @@ class Trainer:
 
         normalize = datasets.get_normalization(train_dataset).to(self.device)
 
+        val_t1acc_best = 0.0
+
         for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
             train_stats = AverageMeter()
             self.model.train()
@@ -467,12 +486,15 @@ class Trainer:
 
             train_stats = train_stats.get_average()
             val_stats = self._evaluate(val_dataloader)
+            if val_stats['t1acc'] > val_t1acc_best: # update best t1acc
+                val_t1acc_best = val_stats['t1acc']
             tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
             self.wandb_run.log(
                 {
                     "learning_rate": lr_scheduler.get_last_lr()[0],
                     **{'train_'+k: v for k, v in train_stats.items()},
                     **{'val_'+k: v for k, v in val_stats.items()},
+                    'val_t1acc_best': val_t1acc_best,
                 }
             )
             if self.config["save_model"] and (epoch+1)%10 == 0:
@@ -524,6 +546,8 @@ class Trainer:
 
         normalize = datasets.get_normalization(train_dataset).to(self.device)
 
+        val_t1acc_best = 0.0
+
         for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
             train_stats = AverageMeter()
             self.model.train()
@@ -559,12 +583,15 @@ class Trainer:
 
             train_stats = train_stats.get_average()
             val_stats = self._evaluate(val_dataloader)
+            if val_stats['t1acc'] > val_t1acc_best: # update best t1acc
+                val_t1acc_best = val_stats['t1acc']
             tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
             self.wandb_run.log(
                 {
                     "learning_rate": lr_scheduler.get_last_lr()[0],
                     **{'train_'+k: v for k, v in train_stats.items()},
                     **{'val_'+k: v for k, v in val_stats.items()},
+                    'val_t1acc_best': val_t1acc_best,
                 }
             )
             if self.config["save_model"] and (epoch+1)%10 == 0:
@@ -609,6 +636,8 @@ class Trainer:
 
         normalize = datasets.get_normalization(train_dataset).to(self.device)
 
+        val_t1acc_best = 0.0
+
         for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
             train_stats = AverageMeter()
             self.model.train()
@@ -650,12 +679,15 @@ class Trainer:
 
             train_stats = train_stats.get_average()
             val_stats = self._evaluate(val_dataloader)
+            if val_stats['t1acc'] > val_t1acc_best: # update best t1acc
+                val_t1acc_best = val_stats['t1acc']
             tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
             self.wandb_run.log(
                 {
                     "learning_rate": lr_scheduler.get_last_lr()[0],
                     **{'train_'+k: v for k, v in train_stats.items()},
                     **{'val_'+k: v for k, v in val_stats.items()},
+                    'val_t1acc_best': val_t1acc_best,
                 }
             )
             if self.config["save_model"] and (epoch+1)%10 == 0:
@@ -709,6 +741,8 @@ class Trainer:
 
         normalize = datasets.get_normalization(train_dataset).to(self.device)
 
+        val_t1acc_best = 0.0
+
         for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
             train_stats = AverageMeter()
             self.model.train()
@@ -749,12 +783,15 @@ class Trainer:
 
             train_stats = train_stats.get_average()
             val_stats = self._evaluate(val_dataloader)
+            if val_stats['t1acc'] > val_t1acc_best: # update best t1acc
+                val_t1acc_best = val_stats['t1acc']
             tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
             self.wandb_run.log(
                 {
                     "learning_rate": lr_scheduler.get_last_lr()[0],
                     **{'train_'+k: v for k, v in train_stats.items()},
                     **{'val_'+k: v for k, v in val_stats.items()},
+                    'val_t1acc_best': val_t1acc_best,
                 }
             )
             if self.config["save_model"] and (epoch+1)%10 == 0:
@@ -806,6 +843,8 @@ class Trainer:
 
         normalize = datasets.get_normalization(train_dataset).to(self.device)
 
+        val_t1acc_best = 0.0
+
         for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
             train_stats = AverageMeter()
             self.model.train()
@@ -849,12 +888,102 @@ class Trainer:
 
             train_stats = train_stats.get_average()
             val_stats = self._evaluate(val_dataloader)
+            if val_stats['t1acc'] > val_t1acc_best: # update best t1acc
+                val_t1acc_best = val_stats['t1acc']
             tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
             self.wandb_run.log(
                 {
                     "learning_rate": lr_scheduler.get_last_lr()[0],
                     **{'train_'+k: v for k, v in train_stats.items()},
                     **{'val_'+k: v for k, v in val_stats.items()},
+                    'val_t1acc_best': val_t1acc_best,
+                }
+            )
+            if self.config["save_model"] and (epoch+1)%10 == 0:
+                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
+                torch.save(self.model.state_dict(), filepath)
+                print(f"SAVED MODEL")
+                # artifact.add_file(filepath)
+        self.wandb_run.log_artifact(artifact)
+
+
+    def fit_nrosd_dropout(self, train_dataset: Dataset, val_dataset: Dataset):
+        if self.config['transform_after_batching']:
+            train_dataset.transform = datasets.get_transform('none', train_dataset)
+            train_dataset.transform2 = datasets.get_transform('none', train_dataset)
+            transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
+            transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+        else:
+            train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
+            train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+
+        val_dataset.transform = datasets.get_transform('none', val_dataset)
+
+        train_dataloader = self.get_dataloader(train_dataset, train=True)
+        val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        self.criterion = self.get_loss_fn(self.config["loss_fn"]).to(self.device)
+        optimizer = self.get_optimizer(self.model)
+        lr_scheduler = self.get_lr_scheduler(optimizer)
+        grad_scaler = torch.cuda.amp.GradScaler(enabled=self.config["enable_amp"])
+        # artifact = wandb.Artifact(f'checkpoints_{self.wandb_run.id}',
+        artifact = wandb.Artifact(
+            'checkpoints',
+            type='model',
+            metadata=self.wandb_run.config['model']
+        )
+
+        distill_criterion = self.get_distill_loss_fn(
+            self.config["distill_loss_fn"],
+            self.config['temperature']
+        ).to(self.device)
+        alpha = self.config['alpha']
+
+        normalize = datasets.get_normalization(train_dataset).to(self.device)
+
+        val_t1acc_best = 0.0
+
+        for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
+            train_stats = AverageMeter()
+            self.model.train()
+            for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
+                target = batch["target"].to(self.device)
+                data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
+                if self.config['transform_after_batching']:
+                    data, data2 = transform1(data), transform2(data2)
+                data, data2 = normalize(data), normalize(data2)
+                with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
+                    output = self.model(data)
+                    with torch.no_grad():
+                        output_teacher = self.model(data2)
+                    target_loss = self.criterion(output, target).mean()
+                    distill_loss = distill_criterion(output, output_teacher).mean()
+                    loss = target_loss * alpha + distill_loss * (1.0-alpha)
+                optimizer.zero_grad()
+                grad_scaler.scale(loss).backward()
+                grad_scaler.step(optimizer)
+                grad_scaler.update()
+                train_stats.update(
+                    target.size(0),
+                    loss=loss.detach(),
+                    t1acc=calculate_accuracy(output, target),
+                    t5acc=calculate_accuracy(output, target, k=5),
+                    target_loss=target_loss.detach(),
+                    distill_loss=distill_loss.detach()
+                )
+            lr_scheduler.step()
+
+            train_stats = train_stats.get_average()
+            val_stats = self._evaluate(val_dataloader)
+            if val_stats['t1acc'] > val_t1acc_best: # update best t1acc
+                val_t1acc_best = val_stats['t1acc']
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
+            self.wandb_run.log(
+                {
+                    "learning_rate": lr_scheduler.get_last_lr()[0],
+                    **{'train_'+k: v for k, v in train_stats.items()},
+                    **{'val_'+k: v for k, v in val_stats.items()},
+                    'val_t1acc_best': val_t1acc_best,
                 }
             )
             if self.config["save_model"] and (epoch+1)%10 == 0:
@@ -908,6 +1037,8 @@ class Trainer:
 
         normalize = datasets.get_normalization(train_dataset).to(self.device)
 
+        val_t1acc_best = 0.0
+
         for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
             train_stats = AverageMeter()
             self.model.train()
@@ -941,12 +1072,15 @@ class Trainer:
 
             train_stats = train_stats.get_average()
             val_stats = self._evaluate(val_dataloader)
+            if val_stats['t1acc'] > val_t1acc_best: # update best t1acc
+                val_t1acc_best = val_stats['t1acc']
             tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
             self.wandb_run.log(
                 {
                     "learning_rate": lr_scheduler.get_last_lr()[0],
                     **{'train_'+k: v for k, v in train_stats.items()},
                     **{'val_'+k: v for k, v in val_stats.items()},
+                    'val_t1acc_best': val_t1acc_best,
                 }
             )
             if self.config["save_model"] and (epoch+1)%10 == 0:
@@ -1212,9 +1346,12 @@ class Trainer:
         data_loader = self.get_dataloader(dataset, train=False)
         results = defaultdict(list)
         for batch in data_loader:
-            output = self.predict_batch(batch["image"])
+            image = batch.pop("image")
+            output = self.predict_batch(image)
             results['logits'].append(output)
-            results['labels'].append(batch['target']) #### 추가한 부분
+            for k, v in batch:
+                results[k].append(v)
+            # results['labels'].append(batch['target']) #### 추가한 부분
         results = {k: torch.cat(v, dim=0) for k, v in results.items()}
         return results
 
