@@ -77,18 +77,17 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
         case "none":
             if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N, OldNoisyCIFAR10, OldNoisyCIFAR100]:
                 return nn.Sequential(
-                    transforms_v2.ToImageTensor(),
+                    transforms_v2.ToImageTensor(), # uint8
                 )
             elif dataset_type in [Clothing1M, WebVisionV1]:
                 return nn.Sequential(
                     transforms_v2.Resize(256, antialias=True),
                     transforms_v2.CenterCrop(224),
-                    transforms_v2.ToImageTensor(),
+                    transforms_v2.ToImageTensor(), # uint8
                 )
             elif dataset_type in [Animal10N]:
                 return nn.Sequential(
-                    transforms_v2.ToImageTensor(),
-                    # transforms_v2.Normalize(*IMAGENET_MEAN_STD, inplace=True),
+                    transforms_v2.ToImageTensor(), # uint8
                 )
             else:
                 raise NotImplementedError(dataset_type)
@@ -97,21 +96,20 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
                 return nn.Sequential(
                     transforms_v2.RandomCrop(32, padding=4),
                     transforms_v2.RandomHorizontalFlip(),
-                    transforms_v2.ToImageTensor(),
+                    transforms_v2.ToImageTensor(), # uint8
                 )
             elif dataset_type in [Clothing1M, WebVisionV1]:
                 return nn.Sequential(
                     transforms_v2.Resize(256, antialias=True),
                     transforms_v2.RandomCrop(224),
                     transforms_v2.RandomHorizontalFlip(),
-                    transforms_v2.ToImageTensor(),
+                    transforms_v2.ToImageTensor(), # uint8
                 )
             elif dataset_type in [Animal10N]:
                 return nn.Sequential(
                     transforms.RandomCrop(64, padding=4),
                     transforms.RandomHorizontalFlip(),
-                    transforms_v2.ToImageTensor(),
-                    # transforms.Normalize(*IMAGENET_MEAN_STD, inplace=True),
+                    transforms_v2.ToImageTensor(), # uint8
                 )
             else:
                 raise NotImplementedError(dataset_type)
@@ -119,14 +117,14 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
             if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N, OldNoisyCIFAR10, OldNoisyCIFAR100]:
                 return nn.Sequential(
                     transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
-                    transforms_v2.ToImageTensor(),
+                    transforms_v2.ToImageTensor(), # uint8
                 )
             elif dataset_type in [Clothing1M, WebVisionV1]:
                 return nn.Sequential(
                     transforms_v2.Resize(256, antialias=True),
                     transforms_v2.CenterCrop(224),
                     transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
-                    transforms_v2.ToImageTensor(),
+                    transforms_v2.ToImageTensor(), # uint8
                 )
             else:
                 raise NotImplementedError(dataset_type)
@@ -135,7 +133,7 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
                 return nn.Sequential(
                     transforms_v2.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0)),
                     transforms_v2.RandomHorizontalFlip(),
-                    transforms_v2.ToImageTensor(),
+                    transforms_v2.ToImageTensor(), # uint8
                 )
             else:
                 raise NotImplementedError(dataset_type)
@@ -144,7 +142,7 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
                 return nn.Sequential(
                     transforms_v2.RandomAdjustSharpness(sharpness_factor=2.0, p=0.5),
                     transforms_v2.RandomHorizontalFlip(),
-                    transforms_v2.ToImageTensor(),
+                    transforms_v2.ToImageTensor(), # uint8
                 )
             else:
                 raise NotImplementedError(dataset_type)
@@ -153,7 +151,7 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
                 return nn.Sequential(
                     transforms_v2.RandomRotation(degrees=15),
                     transforms_v2.RandomHorizontalFlip(),
-                    transforms_v2.ToImageTensor(),
+                    transforms_v2.ToImageTensor(), # uint8
                 )
             else:
                 raise NotImplementedError(dataset_type)
@@ -162,7 +160,7 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
                 return nn.Sequential(
                     transforms_v2.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
                     transforms_v2.RandomHorizontalFlip(),
-                    transforms_v2.ToImageTensor(),
+                    transforms_v2.ToImageTensor(), # uint8
                 )
             else:
                 raise NotImplementedError(dataset_type)
@@ -181,7 +179,7 @@ def get_normalization(dataset: Dataset):
     else:
         raise NotImplementedError(dataset_type)
     return nn.Sequential(
-        transforms_v2.ConvertDtype(),
+        transforms_v2.ConvertDtype(), # uint8 -> float32
         Normalize2D(mean, std),
     )
 

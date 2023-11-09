@@ -191,7 +191,7 @@ if __name__ == '__main__':
             dataset: old_noisy_cifar10
             noise_type: symmetric
             noise_rate: 0.5
-            random_seed: 43
+            random_seed: 42
         
         model:
             architecture: resnet34_dropout
@@ -215,13 +215,12 @@ if __name__ == '__main__':
             batch_size: 128
             save_model: False
             loss_fn: cross_entropy
-            alpha: 0.2
+            alpha: 0.5
             teacher_aug: autoaugment
             student_aug: randomcrop
             distill_loss_fn: cross_entropy
             temperature: 1.0
             enable_amp: False
-            ema_beta: 0.9999
             transform_after_batching: false
         """
         )
@@ -236,7 +235,7 @@ if __name__ == '__main__':
                     config['data']['noise_type'] = noise_type
                     config['data']['noise_rate'] = noise_rate
                     config['model']['num_classes'] = num_classes
-                    config['wandb']['name'] = f'ablations-CE+NRD+EMA+dropout'
+                    config['wandb']['name'] = f'ablations-CE+NRD+dropout'
                     config['data']['random_seed'] = random.randint(0, 1000)
                     executor.submit(main, deepcopy(config))
 

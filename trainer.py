@@ -1338,21 +1338,24 @@ class Trainer:
     @torch.no_grad()
     def predict_batch(self, input: torch.Tensor) -> torch.Tensor:
         self.model.eval()
-        return self.model(input.to(self.device))
+        return self.model(input)
 
     @torch.no_grad()
     def inference(self, dataset: Dataset) -> dict:
         self.model.eval()
         data_loader = self.get_dataloader(dataset, train=False)
+        
+        normalize = datasets.get_normalization(dataset).to(self.device)
         results = defaultdict(list)
-        for batch in data_loader:
+        for batch in tqdm.tqdm(data_loader):
+            # image = batch["image"]
             image = batch.pop("image")
+            image = normalize(image.to(self.device))
             output = self.predict_batch(image)
             results['logits'].append(output)
-            for k, v in batch:
+            for k, v in batch.items():
                 results[k].append(v)
-            # results['labels'].append(batch['target']) #### 추가한 부분
-        results = {k: torch.cat(v, dim=0) for k, v in results.items()}
+        results = {k: torch.cat(v, dim=0).cpu() for k, v in results.items()}
         return results
 
     @torch.no_grad()
