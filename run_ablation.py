@@ -24,7 +24,7 @@ if __name__ == '__main__':
         #     random_seed: 43
         
         # model:
-        #     architecture: resnet18
+        #     architecture: resnet34
         #     num_classes: 10
         
         # wandb:
