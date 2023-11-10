@@ -57,6 +57,7 @@ if __name__ == '__main__':
     
     data:
         dataset: clothing1m
+        root: /root/
     
     model:
         architecture: resnet50_torchvision
@@ -64,7 +65,7 @@ if __name__ == '__main__':
         pretrained: true
 
     wandb:
-        mode: disabled # "disabled" or "online"
+        mode: online # "disabled" or "online"
         entity: hyounguk-shon
         project: noisy-label
         name: Clothing1M
@@ -95,6 +96,7 @@ if __name__ == '__main__':
     
     # data:
     #     dataset: clothing1m
+        # root: /root/
     
     # model:
     #     architecture: resnet50_torchvision
@@ -102,7 +104,7 @@ if __name__ == '__main__':
     #     pretrained: true
 
     # wandb:
-    #     mode: disabled # "disabled" or "online"
+    #     mode: online # "disabled" or "online"
     #     entity: hyounguk-shon
     #     project: noisy-label
     #     name: Clothing1M
