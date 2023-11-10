@@ -96,7 +96,7 @@ if __name__ == '__main__':
         method: fit
         
         data:
-            dataset: noisy_cifar10
+            dataset: old_noisy_cifar10
             noise_type: symmetric
             noise_rate: 0.5
             random_seed: 43

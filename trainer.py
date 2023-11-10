@@ -83,6 +83,12 @@ class Trainer:
                     milestones=[4*n, 6*n],
                     gamma=0.1,
                 )
+            case "multistep_c1m":
+                lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                    optimizer,
+                    milestones=[self.config["max_epoch"] // 2,],
+                    gamma=0.1,
+                )
             case _:
                 raise NotImplementedError(self.config["lr_scheduler"])
         return lr_scheduler
