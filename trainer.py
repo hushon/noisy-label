@@ -1344,7 +1344,8 @@ class Trainer:
     @torch.no_grad()
     def predict_batch(self, input: torch.Tensor) -> torch.Tensor:
         self.model.eval()
-        return self.model(input)
+        with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
+            return self.model(input).float()
 
     @torch.no_grad()
     def inference(self, dataset: Dataset) -> dict:

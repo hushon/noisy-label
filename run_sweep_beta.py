@@ -56,7 +56,8 @@ if __name__ == '__main__':
     max_workers = torch.cuda.device_count()
 
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        for ema_beta in [0.01, 0.1, 0.999, 0.9995, 0.9999, 0.99995, 0.99999]:
+        # for ema_beta in [0.01, 0.1, 0.999, 0.9995, 0.9999, 0.99995, 0.99999]:
+        for ema_beta in [0.15, 0.2, 0.25, 0.3]:
             config['trainer']['ema_beta'] = ema_beta
             config['wandb']['name'] = f'{ema_beta=}'
             config['data']['random_seed'] = random.randint(0, 1000)
