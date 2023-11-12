@@ -114,7 +114,7 @@ if __name__ == '__main__':
             student_aug: randomcrop
             distill_loss_fn: cross_entropy
             temperature: 1.0
-            enable_amp: False
+            enable_amp: true
             transform_after_batching: true
             alpha: 0.5
         """
