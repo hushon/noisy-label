@@ -1238,7 +1238,7 @@ class Trainer:
                         output_teacher = einops.rearrange(output_teacher, '(n b) c -> n b c', n=5).mean(0)
                     target_loss = self.criterion(output, target)
                     distill_loss = distill_criterion(output, output_teacher)
-                    gating = torch.nn.functional.cross_entropy(output_teacher, output_teacher.softmax(-1), reduction='none').sigmoid().detach()
+                    gating = (torch.nn.functional.cross_entropy(output_teacher, output_teacher.softmax(-1), reduction='none').sigmoid().detach() - 0.5)*2
                     loss = (target_loss * gating).mean() * alpha + (distill_loss * (1.0-gating)).mean() * (1.0-alpha)
                 optimizer.zero_grad()
                 grad_scaler.scale(loss).backward()
@@ -1250,7 +1250,8 @@ class Trainer:
                     t1acc=calculate_accuracy(output, target),
                     t5acc=calculate_accuracy(output, target, k=5),
                     target_loss=target_loss.detach(),
-                    distill_loss=distill_loss.detach()
+                    distill_loss=distill_loss.detach(),
+                    gating=gating,
                 )
             lr_scheduler.step()
 

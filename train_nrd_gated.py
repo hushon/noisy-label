@@ -93,7 +93,7 @@ if __name__ == '__main__':
             num_classes: 10
         
         wandb:
-            mode: disabled # "disabled" or "online"
+            mode: online # "disabled" or "online"
             entity: hyounguk-shon
             project: noisy-label
             name: CIFAR10-CE-gatedNRD-randomerasing
