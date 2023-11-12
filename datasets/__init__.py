@@ -164,6 +164,24 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
                 )
             else:
                 raise NotImplementedError(dataset_type)
+        case "autoaugment_randomerasing":
+            if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N, OldNoisyCIFAR10, OldNoisyCIFAR100]:
+                return nn.Sequential(
+                    transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+                    transforms_v2.RandomCrop(32, padding=4),
+                    transforms_v2.RandomHorizontalFlip(),
+                    transforms_v2.ToImageTensor(), # PIL.Image -> uint8
+                    transforms_v2.RandomErasing(1.0, [0.15, 0.15], [1.0, 1.0], 124),
+                )
+            elif dataset_type in [Clothing1M, WebVisionV1]:
+                return nn.Sequential(
+                    transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
+                    transforms_v2.Resize(256, antialias=True),
+                    transforms_v2.CenterCrop(224),
+                    # transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
+                    transforms_v2.ToImageTensor(), # PIL.Image -> uint8
+                    transforms_v2.RandomErasing(1.0, [0.15, 0.15], [1.0, 1.0], 124),
+                )
         case _:
             raise NotImplementedError(op_name)
 

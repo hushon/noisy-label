@@ -129,3 +129,19 @@ class WebVisionV1(torch.utils.data.Dataset):
                 'image2': self.transform2(image),
             })
         return output
+
+
+
+class ImageNetVal(torchvision.datasets.ImageNet):
+    def __init__(self, root, num_classes=50, split='val', **kwargs):
+        super(ImageNetVal, self).__init__(root, split=split, **kwargs)
+
+        # Extract only the images of the first num_classes classes
+        self.samples = list() # This is part of the superclass of ImageNet
+        for img, target in self.imgs:
+            if target < num_classes:
+                self.samples.append((img,target))
+
+        # Update members of subclass too.
+        self.imgs = self.samples
+        self.targets = [target for img, target in self.samples]

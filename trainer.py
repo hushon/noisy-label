@@ -136,117 +136,6 @@ class Trainer:
                 raise NotImplementedError(fn_name)
         return fn
 
-    # @staticmethod
-    # def get_transform(op_name: str, dataset: Dataset):
-    #     dataset_type = type(dataset)
-    #     match op_name:
-    #         # case "totensor":
-    #         #     transform = transforms.Compose([
-    #         #         transforms.Lambda(lambda x: torch.tensor(np.array(x)).permute(2,0,1).contiguous()),
-    #         #     ]) # output is a (3, 32, 32) uint8 tensor
-    #         case "none":
-    #             match dataset_type:
-    #                 case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
-    #                     transform = nn.Sequential(
-    #                         transforms_v2.ToImageTensor(),
-    #                     )
-    #                 case datasets.Clothing1M | datasets.WebVisionV1:
-    #                     transform = nn.Sequential(
-    #                         transforms_v2.Resize(256),
-    #                         transforms_v2.CenterCrop(224),
-    #                         transforms_v2.ToImageTensor(),
-    #                         )
-    #                 case datasets.WebVisionV1:
-    #                     transform = nn.Sequential( # normalized loss style
-    #                         transforms_v2.Resize(256),
-    #                         transforms_v2.CenterCrop(224),
-    #                         transforms_v2.ToImageTensor(),
-    #                         )
-    #                 case _:
-    #                     raise NotImplementedError(dataset_type)
-    #         case "randomcrop":
-    #             match dataset_type:
-    #                 case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
-    #                     transform = nn.Sequential(
-    #                         transforms_v2.RandomCrop(32, padding=4),
-    #                         transforms_v2.RandomHorizontalFlip(),
-    #                         transforms_v2.ToImageTensor(),
-    #                         )
-    #                 case datasets.Clothing1M | datasets.WebVisionV1:
-    #                     transform = nn.Sequential(
-    #                         transforms_v2.Resize(256),
-    #                         transforms_v2.RandomCrop(224),
-    #                         transforms_v2.RandomHorizontalFlip(),
-    #                         transforms_v2.ToImageTensor(),
-    #                         )
-    #                 case datasets.WebVisionV1:
-    #                     transform = nn.Sequential( # normalized loss style
-    #                         transforms_v2.RandomResizedCrop(224),
-    #                         transforms_v2.RandomHorizontalFlip(),
-    #                         transforms_v2.ToImageTensor(),
-    #                         )
-    #                 case _:
-    #                     raise NotImplementedError(dataset_type)
-    #         case "autoaugment":
-    #             match dataset_type:
-    #                 case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
-    #                     transform = nn.Sequential(
-    #                         transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
-    #                         transforms_v2.ToImageTensor(),
-    #                         )
-    #                 case datasets.Clothing1M | datasets.WebVisionV1:
-    #                     transform = nn.Sequential(
-    #                         transforms_v2.Resize(256),
-    #                         transforms_v2.CenterCrop(224),
-    #                         transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
-    #                         transforms_v2.ToImageTensor(),
-    #                         )
-    #                 case _:
-    #                     raise NotImplementedError(dataset_type)
-    #         case "gaussianblur":
-    #             match dataset_type:
-    #                 case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
-    #                     transform = nn.Sequential(
-    #                         transforms_v2.GaussianBlur(kernel_size=3, sigma=(0.1, 2.0)),
-    #                         transforms_v2.RandomHorizontalFlip(),
-    #                         transforms_v2.ToImageTensor(),
-    #                         )
-    #                 case _:
-    #                     raise NotImplementedError(dataset_type)
-    #         case "sharpen":
-    #             match dataset_type:
-    #                 case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
-    #                     transform = nn.Sequential(
-    #                         transforms_v2.RandomAdjustSharpness(sharpness_factor=2.0, p=0.5),
-    #                         transforms_v2.RandomHorizontalFlip(),
-    #                         transforms_v2.ToImageTensor(),
-    #                         )
-    #                 case _:
-    #                     raise NotImplementedError(dataset_type)
-    #         case "rotate":
-    #             match dataset_type:
-    #                 case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
-    #                     transform = nn.Sequential(
-    #                         transforms_v2.RandomRotation(degrees=15),
-    #                         transforms_v2.RandomHorizontalFlip(),
-    #                         transforms_v2.ToImageTensor(),
-    #                         )
-    #                 case _:
-    #                     raise NotImplementedError(dataset_type)
-    #         case "colorjitter":
-    #             match dataset_type:
-    #                 case datasets.CIFAR10 | datasets.NoisyCIFAR10 | datasets.NoisyCIFAR3 | datasets.CIFAR10N | datasets.CIFAR100 | datasets.NoisyCIFAR100 | datasets.CIFAR100N:
-    #                     transform = nn.Sequential(
-    #                         transforms_v2.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.1),
-    #                         transforms_v2.RandomHorizontalFlip(),
-    #                         transforms_v2.ToImageTensor(),
-    #                         )
-    #                 case _:
-    #                     raise NotImplementedError(dataset_type)
-    #         case _:
-    #             raise NotImplementedError(op_name)
-    #     return transform
-
     def get_dataloader(self, dataset: Dataset, train=True) -> DataLoader:
         # return DataLoader(
         return datasets.MultiEpochsDataLoader(
@@ -1097,6 +986,202 @@ class Trainer:
         self.wandb_run.log_artifact(artifact)
 
 
+    def fit_nrosd_v2(self, train_dataset: Dataset, val_dataset: Dataset):
+        if self.config['transform_after_batching']:
+            train_dataset.transform = datasets.get_transform('none', train_dataset)
+            train_dataset.transform2 = datasets.get_transform('none', train_dataset)
+            transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
+            transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+        else:
+            train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
+            train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+
+        val_dataset.transform = datasets.get_transform('none', val_dataset)
+
+        train_dataloader = self.get_dataloader(train_dataset, train=True)
+        val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        self.criterion = self.get_loss_fn(self.config["loss_fn"]).to(self.device)
+        optimizer = self.get_optimizer(self.model)
+        lr_scheduler = self.get_lr_scheduler(optimizer)
+        grad_scaler = torch.cuda.amp.GradScaler(enabled=self.config["enable_amp"])
+        # artifact = wandb.Artifact(f'checkpoints_{self.wandb_run.id}',
+        artifact = wandb.Artifact(
+            'checkpoints',
+            type='model',
+            metadata=self.wandb_run.config['model']
+        )
+
+        distill_criterion = self.get_distill_loss_fn(
+            self.config["distill_loss_fn"],
+            self.config['temperature']
+        ).to(self.device)
+
+        normalize = datasets.get_normalization(train_dataset).to(self.device)
+
+        val_t1acc_best = 0.0
+
+        for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
+            train_stats = AverageMeter()
+            self.model.train()
+            for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
+                target = batch["target"].to(self.device)
+                data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
+                data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
+                if self.config['transform_after_batching']:
+                    data, data2 = transform1(data), torch.stack([transform2(data2) for _ in range(10)], dim=0)
+                else:
+                    raise NotImplementedError
+                data2 = einops.rearrange(data2, 'n b c h w -> (n b) c h w')
+                data, data2 = normalize(data), normalize(data2)
+                with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
+                    # self.model.train()
+                    output = self.model(data)
+                    # loss = target_loss * alpha + distill_loss * (1.0-alpha)
+                    if epoch < self.config['warmup_epoch']:
+                        target_loss = self.criterion(output, target).mean()
+                        distill_loss = torch.tensor(0.0)
+                        loss = target_loss
+                    else:
+                        with torch.no_grad():
+                            # self.model.eval()
+                            output_teacher = self.model(data2)
+                            output_teacher = einops.rearrange(output_teacher, '(n b) c -> n b c', n=10).mean(0)
+                        target_loss = torch.tensor(0.0)
+                        distill_loss = distill_criterion(output, output_teacher).mean()
+                        loss = distill_loss
+                optimizer.zero_grad()
+                grad_scaler.scale(loss).backward()
+                grad_scaler.step(optimizer)
+                grad_scaler.update()
+                train_stats.update(
+                    target.size(0),
+                    loss=loss.detach(),
+                    t1acc=calculate_accuracy(output, target),
+                    t5acc=calculate_accuracy(output, target, k=5),
+                    target_loss=target_loss.detach(),
+                    distill_loss=distill_loss.detach()
+                )
+            lr_scheduler.step()
+
+            train_stats = train_stats.get_average()
+            val_stats = self._evaluate(val_dataloader)
+            if val_stats['t1acc'] > val_t1acc_best: # update best t1acc
+                val_t1acc_best = val_stats['t1acc']
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
+            self.wandb_run.log(
+                {
+                    "learning_rate": lr_scheduler.get_last_lr()[0],
+                    **{'train_'+k: v for k, v in train_stats.items()},
+                    **{'val_'+k: v for k, v in val_stats.items()},
+                    'val_t1acc_best': val_t1acc_best,
+                }
+            )
+            if self.config["save_model"] and (epoch+1)%10 == 0:
+                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
+                torch.save(self.model.state_dict(), filepath)
+                print(f"SAVED MODEL")
+                artifact.add_file(filepath)
+        self.wandb_run.log_artifact(artifact)
+
+
+    def fit_nrosd_offline(self, train_dataset: Dataset, val_dataset: Dataset):
+        if self.config['transform_after_batching']:
+            train_dataset.transform = datasets.get_transform('none', train_dataset)
+            train_dataset.transform2 = datasets.get_transform('none', train_dataset)
+            transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
+            transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+        else:
+            train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
+            train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+
+        val_dataset.transform = datasets.get_transform('none', val_dataset)
+
+        train_dataloader = self.get_dataloader(train_dataset, train=True)
+        val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        self.criterion = self.get_loss_fn(self.config["loss_fn"]).to(self.device)
+        optimizer = self.get_optimizer(self.model)
+        lr_scheduler = self.get_lr_scheduler(optimizer)
+        grad_scaler = torch.cuda.amp.GradScaler(enabled=self.config["enable_amp"])
+        # artifact = wandb.Artifact(f'checkpoints_{self.wandb_run.id}',
+        artifact = wandb.Artifact(
+            'checkpoints',
+            type='model',
+            metadata=self.wandb_run.config['model']
+        )
+
+        distill_criterion = self.get_distill_loss_fn(
+            self.config["distill_loss_fn"],
+            self.config['temperature']
+        ).to(self.device)
+
+        normalize = datasets.get_normalization(train_dataset).to(self.device)
+        import copy
+        teacher_model = copy.deepcopy(self.model).to(self.device).eval()
+
+
+        val_t1acc_best = 0.0
+
+        for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
+            train_stats = AverageMeter()
+            self.model.train()
+            for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
+                target = batch["target"].to(self.device)
+                data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
+                data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
+                if self.config['transform_after_batching']:
+                    data, data2 = transform1(data), torch.stack([transform2(data2) for _ in range(10)], dim=0)
+                else:
+                    raise NotImplementedError
+                data2 = einops.rearrange(data2, 'n b c h w -> (n b) c h w')
+                data, data2 = normalize(data), normalize(data2)
+                with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
+                    # self.model.train()
+                    output = self.model(data)
+                    # loss = target_loss * alpha + distill_loss * (1.0-alpha)
+                    with torch.no_grad():
+                        # self.model.eval()
+                        output_teacher = teacher_model(data2)
+                        output_teacher = einops.rearrange(output_teacher, '(n b) c -> n b c', n=10).mean(0)
+                    target_loss = torch.tensor(0.0)
+                    distill_loss = distill_criterion(output, output_teacher).mean()
+                    loss = distill_loss
+                optimizer.zero_grad()
+                grad_scaler.scale(loss).backward()
+                grad_scaler.step(optimizer)
+                grad_scaler.update()
+                train_stats.update(
+                    target.size(0),
+                    loss=loss.detach(),
+                    t1acc=calculate_accuracy(output, target),
+                    t5acc=calculate_accuracy(output, target, k=5),
+                    target_loss=target_loss.detach(),
+                    distill_loss=distill_loss.detach()
+                )
+            lr_scheduler.step()
+
+            train_stats = train_stats.get_average()
+            val_stats = self._evaluate(val_dataloader)
+            if val_stats['t1acc'] > val_t1acc_best: # update best t1acc
+                val_t1acc_best = val_stats['t1acc']
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
+            self.wandb_run.log(
+                {
+                    "learning_rate": lr_scheduler.get_last_lr()[0],
+                    **{'train_'+k: v for k, v in train_stats.items()},
+                    **{'val_'+k: v for k, v in val_stats.items()},
+                    'val_t1acc_best': val_t1acc_best,
+                }
+            )
+            if self.config["save_model"] and (epoch+1)%10 == 0:
+                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
+                torch.save(self.model.state_dict(), filepath)
+                print(f"SAVED MODEL")
+                artifact.add_file(filepath)
+        self.wandb_run.log_artifact(artifact)
+
+
 
     def distill(self, train_dataset: Dataset, val_dataset: Dataset, teacher_model: nn.Module):
         train_dataset.transform = transforms.Compose([
@@ -1343,13 +1428,12 @@ class Trainer:
 
     @torch.no_grad()
     def predict_batch(self, input: torch.Tensor) -> torch.Tensor:
-        self.model.eval()
         with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
             return self.model(input).float()
 
     @torch.no_grad()
-    def inference(self, dataset: Dataset) -> dict:
-        self.model.eval()
+    def inference(self, dataset: Dataset, train=False) -> dict:
+        self.model.train(train)
         data_loader = self.get_dataloader(dataset, train=False)
         
         normalize = datasets.get_normalization(dataset).to(self.device)

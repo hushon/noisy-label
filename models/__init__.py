@@ -1,5 +1,5 @@
 from torch import nn
-from models import resnet
+from models import resnet, preact_resnet
 # from .resnet import resnet18, resnet34, resnet50, resnet101, resnet152
 from .module import MCDropout, GaussianDropout, GaussianMCDropout, \
     MeanAbsoluteError, LambdaLayer, KLDivDistillationLoss, \
@@ -39,6 +39,8 @@ def get_model(architecture, num_classes, pretrained=False) -> nn.Module:
             model.fc = nn.Linear(2048, num_classes)
         case "resnet34_dropout":
             model = resnet.resnet34(pretrained=False, in_channels=3, num_classes=num_classes, dropout=nn.Dropout(0.5))
+        case "preactresnet34":
+            model = preact_resnet.preactresnet34(num_classes=num_classes)
         case _:
             raise NotImplementedError
     return model

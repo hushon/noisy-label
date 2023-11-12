@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
 
@@ -94,7 +95,7 @@ class Bottleneck(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block, layers, in_channels, num_classes=1000, dropout=None):
+    def __init__(self, block, layers, in_channels, num_classes=1000, dropout=nn.Identity()):
         super(ResNet, self).__init__()
         self.inplanes = 64 
         self.conv1 = nn.Conv2d(in_channels, 64, kernel_size=3, stride=1, padding=1, bias=False)
@@ -125,7 +126,7 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def get_feature(self, x):
+    def forward(self, x):
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -137,14 +138,29 @@ class ResNet(nn.Module):
 
         x = self.avgpool(x)
         x = x.view(x.size(0), -1)
-        return x
-
-    def forward(self, x):
-        x = self.get_feature(x)
-        if self.dropout is not None:
-            x = self.dropout(x)
+        x = self.dropout(x)
         x = self.fc(x)
         return x
+    # def forward(self, x):
+    #     x = self.conv1(x)
+    #     x = self.bn1(x)
+    #     x = self.relu(x)
+
+    #     x = self.layer1(x)
+    #     x = self.layer2(x)
+    #     x = self.layer3(x)
+    #     x = self.layer4(x)
+
+    #     x: torch.Tensor
+    #     b, h, w = x.size(0), x.size(2), x.size(3)
+    #     mask = x.new_ones((b, h, w))
+    #     mask = self.dropout(mask).unsqueeze(1)
+    #     x = x * mask
+
+    #     x = self.avgpool(x)
+    #     x = x.view(x.size(0), -1)
+    #     x = self.fc(x)
+    #     return x
 
 
 def resnet18(pretrained=False, **kwargs):
