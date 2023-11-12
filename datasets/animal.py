@@ -34,13 +34,13 @@ class Animal10N(torch.utils.data.Dataset):
     base_folder = 'Animal-10N'
 
     def __init__(
-        self,
-        root: str,
-        train: bool = True,
-        transform = None,
-        transform2 = None,
-        target_transform = None,
-        download: bool = False,
+            self,
+            root: str,
+            train: bool = True,
+            transform = None,
+            transform2 = None,
+            target_transform = None,
+            download: bool = False,
         ) -> None:
         self.train = train
         self.root = root

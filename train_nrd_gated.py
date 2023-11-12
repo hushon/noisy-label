@@ -55,14 +55,6 @@ def main(config: dict):
 
     model = get_model(**config["model"])
 
-    ## restore checkpoint
-    wandb_run_id = "2cvre1ep"
-    ckpt_name="model_199.pth"
-    checkpoint = wandb.restore(ckpt_name, run_path=f"hyounguk-shon/noisy-label/{wandb_run_id}", replace=True, root='./temp')
-    model.load_state_dict(torch.load(checkpoint.name, map_location="cpu"))
-    print(f"Loaded checkpoint: {checkpoint.name}")
-
-
     trainer = Trainer(
         model=model,
         config=config['trainer'],
@@ -85,10 +77,10 @@ if __name__ == '__main__':
     max_workers = torch.cuda.device_count()
 
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        # ==== CE+ offlineNRD + randomerasing ====
+        # ==== CE+ gatedNRD + randomerasing ====
         config = yaml.safe_load(
         r"""
-        method: fit_nrosd_offline
+        method: fit_nrosd_multiple_gated
         
         data:
             dataset: old_noisy_cifar10
@@ -101,15 +93,15 @@ if __name__ == '__main__':
             num_classes: 10
         
         wandb:
-            mode: online # "disabled" or "online"
+            mode: disabled # "disabled" or "online"
             entity: hyounguk-shon
             project: noisy-label
-            name: CIFAR10-CE-offlineNRD-randomerasing
+            name: CIFAR10-CE-gatedNRD-randomerasing
             save_code: True
         
         trainer:
-            optimizer: adam
-            init_lr: 0.00001
+            optimizer: sgd
+            init_lr: 0.1
             momentum: 0.9
             weight_decay: 1.0e-4
             lr_scheduler: multistep
@@ -124,6 +116,7 @@ if __name__ == '__main__':
             temperature: 1.0
             enable_amp: False
             transform_after_batching: true
+            alpha: 0.5
         """
         )
         main(config)
