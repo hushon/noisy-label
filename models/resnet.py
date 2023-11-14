@@ -126,21 +126,6 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-
-        x = self.layer1(x)
-        x = self.layer2(x)
-        x = self.layer3(x)
-        x = self.layer4(x)
-
-        x = self.avgpool(x)
-        x = x.view(x.size(0), -1)
-        x = self.dropout(x)
-        x = self.fc(x)
-        return x
     # def forward(self, x):
     #     x = self.conv1(x)
     #     x = self.bn1(x)
@@ -151,16 +136,30 @@ class ResNet(nn.Module):
     #     x = self.layer3(x)
     #     x = self.layer4(x)
 
-    #     x: torch.Tensor
-    #     b, h, w = x.size(0), x.size(2), x.size(3)
-    #     mask = x.new_ones((b, h, w))
-    #     mask = self.dropout(mask).unsqueeze(1)
-    #     x = x * mask
-
     #     x = self.avgpool(x)
     #     x = x.view(x.size(0), -1)
+    #     x = self.dropout(x)
     #     x = self.fc(x)
     #     return x
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+
+        b, h, w = x.size(0), x.size(2), x.size(3)
+        mask = x.new_ones((b, 1, h, w))
+        mask = self.dropout(mask)
+        x = x * mask
+
+        x = self.avgpool(x)
+        x = x.view(x.size(0), -1)
+        x = self.fc(x)
+        return x
 
 
 def resnet18(pretrained=False, **kwargs):

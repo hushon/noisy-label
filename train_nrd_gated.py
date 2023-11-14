@@ -113,10 +113,11 @@ if __name__ == '__main__':
             teacher_aug: autoaugment_randomerasing
             student_aug: randomcrop
             distill_loss_fn: cross_entropy
-            temperature: 1.0
+            temperature: 5.0
             enable_amp: true
             transform_after_batching: true
             alpha: 0.5
+            early_stop_epoch: 60
         """
         )
         main(config)

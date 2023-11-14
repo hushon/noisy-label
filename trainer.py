@@ -252,6 +252,8 @@ class Trainer:
         val_t1acc_best = 0.0
 
         for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
+            if epoch == self.config['early_stop_epoch']: # use early stopping
+                break
             train_stats = AverageMeter()
             self.model.train()
             for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
@@ -1224,7 +1226,7 @@ class Trainer:
                 target = batch["target"].to(self.device)
                 data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
                 if self.config['transform_after_batching']:
-                    data, data2 = transform1(data), torch.stack([transform2(data2) for _ in range(20)], dim=0)
+                    data, data2 = transform1(data), torch.stack([transform2(data2) for _ in range(10)], dim=0)
                 else:
                     raise NotImplementedError
                 data2 = einops.rearrange(data2, 'n b c h w -> (n b) c h w')
@@ -1235,7 +1237,7 @@ class Trainer:
                     with torch.no_grad():
                         # self.model.eval()
                         output_teacher = self.model(data2)
-                        output_teacher = einops.rearrange(output_teacher, '(n b) c -> n b c', n=20).mean(0)
+                        output_teacher = einops.rearrange(output_teacher, '(n b) c -> n b c', n=10).mean(0)
                     target_loss = self.criterion(output, target)
                     distill_loss = distill_criterion(output, output_teacher)
                     gating = (torch.nn.functional.cross_entropy(output_teacher, output_teacher.softmax(-1), reduction='none').sigmoid().detach() - 0.5)*2
