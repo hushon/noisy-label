@@ -146,9 +146,94 @@ if __name__ == '__main__':
     #     warmup_epoch: 120
     # """
     # )
+    # config = yaml.safe_load(
+    # r"""
+    # method: fit_nrosd
+    
+    # data:
+    #     dataset: old_noisy_cifar10
+    #     noise_type: symmetric
+    #     noise_rate: 0.5
+    #     random_seed: 42
+
+    # model:
+    #     architecture: preactresnet34
+    #     num_classes: 10
+    
+    # wandb:
+    #     mode: online # "disabled" or "online"
+    #     entity: hyounguk-shon
+    #     project: noisy-label
+    #     name: CIFAR10-CE-NRD
+    #     save_code: True
+    
+    # trainer:
+    #     optimizer: sgd
+    #     init_lr: 0.1
+    #     momentum: 0.9
+    #     weight_decay: 1.0e-4
+    #     lr_scheduler: multistep
+    #     max_epoch: 200
+    #     num_workers: 4
+    #     batch_size: 128
+    #     save_model: False
+    #     loss_fn: cross_entropy
+    #     alpha: 0.4
+    #     teacher_aug: autoaugment_randomerasing
+    #     student_aug: randomcrop
+    #     distill_loss_fn: cross_entropy
+    #     temperature: 5.0
+    #     enable_amp: False
+    #     transform_after_batching: true
+    #     early_stop_epoch: 60
+    # """
+    # )
+    # config = yaml.safe_load(
+    # r"""
+    # method: fit_nrosd_gjs
+    
+    # data:
+    #     dataset: old_noisy_cifar10
+    #     noise_type: symmetric
+    #     noise_rate: 0.5
+    #     random_seed: 42
+
+    # model:
+    #     architecture: preactresnet34
+    #     num_classes: 10
+    
+    # wandb:
+    #     mode: disabled # "disabled" or "online"
+    #     entity: hyounguk-shon
+    #     project: noisy-label
+    #     name: CIFAR10-CE-NRD
+    #     save_code: True
+    
+    # trainer:
+    #     optimizer: sgd
+    #     init_lr: 0.1
+    #     momentum: 0.9
+    #     weight_decay: 1.0e-4
+    #     lr_scheduler: multistep
+    #     max_epoch: 200
+    #     num_workers: 4
+    #     batch_size: 128
+    #     save_model: False
+    #     loss_fn: cross_entropy
+    #     alpha: 0.0
+    #     teacher_aug: autoaugment_randomerasing
+    #     student_aug: randomcrop
+    #     distill_loss_fn: gjs
+    #     temperature: 5.0
+    #     enable_amp: False
+    #     transform_after_batching: true
+    #     early_stop_epoch: 200
+    # """
+    # )
+
     config = yaml.safe_load(
     r"""
-    method: fit_nrosd
+    method: fit
     
     data:
         dataset: old_noisy_cifar10
@@ -157,7 +242,7 @@ if __name__ == '__main__':
         random_seed: 42
 
     model:
-        architecture: preactresnet34
+        architecture: resnet34
         num_classes: 10
     
     wandb:
@@ -178,16 +263,15 @@ if __name__ == '__main__':
         batch_size: 128
         save_model: False
         loss_fn: cross_entropy
-        alpha: 0.4
+        alpha: 0.0
         teacher_aug: autoaugment_randomerasing
-        student_aug: randomcrop
-        distill_loss_fn: cross_entropy
+        aug: randomcrop
+        distill_loss_fn: gjs
         temperature: 5.0
         enable_amp: False
         transform_after_batching: true
-        early_stop_epoch: 60
+        early_stop_epoch: 200
     """
     )
-
 
     main(config)

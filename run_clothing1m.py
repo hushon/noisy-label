@@ -53,7 +53,6 @@ if __name__ == '__main__':
     
     data:
         dataset: clothing1m
-        root: /root/
     
     model:
         architecture: resnet50_torchvision
@@ -78,11 +77,11 @@ if __name__ == '__main__':
         batch_size: 64
         save_model: false
         loss_fn: cross_entropy
-        alpha: 0.2
-        teacher_aug: autoaugment
+        alpha: 0.5
+        teacher_aug: autoaugment_randomerasing
         student_aug: randomcrop
         distill_loss_fn: cross_entropy
-        temperature: 1.0
+        temperature: 5.0
         enable_amp: true
         ema_beta: 0.25
         transform_after_batching: false

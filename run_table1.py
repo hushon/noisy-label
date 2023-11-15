@@ -143,7 +143,7 @@ if __name__ == '__main__':
             mode: online # "disabled" or "online"
             entity: hyounguk-shon
             project: noisy-label
-            name: CIFAR10-CE-NRD
+            name: CIFAR100-CE-NRD
             save_code: True
         
         trainer:
@@ -161,7 +161,7 @@ if __name__ == '__main__':
             teacher_aug: autoaugment_randomerasing
             student_aug: randomcrop
             distill_loss_fn: cross_entropy
-            temperature: 10.0
+            temperature: 5.0
             enable_amp: False
             transform_after_batching: false
             early_stop_epoch: 60
@@ -174,6 +174,11 @@ if __name__ == '__main__':
                     'asymmetric': [0.1, 0.2, 0.4]
                 }[noise_type]
                 for noise_rate in noise_rate_list:
+                    if dataset == 'old_noisy_cifar10':
+                        alpha = 0.4
+                    elif dataset == 'old_noisy_cifar100':
+                        alpha = 0.3
+                    config['trainer']['alpha'] = alpha
                     config['data']['dataset'] = dataset
                     config['data']['noise_type'] = noise_type
                     config['data']['noise_rate'] = noise_rate

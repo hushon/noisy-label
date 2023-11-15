@@ -142,20 +142,20 @@ if __name__ == '__main__':
     method: fit_nrosd
     
     data:
-        dataset: old_noisy_cifar10
-        noise_type: asymmetric
-        noise_rate: 0.1
+        dataset: old_noisy_cifar100
+        noise_type: symmetric
+        noise_rate: 0.8
         random_seed: 42
 
     model:
         architecture: resnet34
-        num_classes: 10
+        num_classes: 100
     
     wandb:
         mode: online # "disabled" or "online"
         entity: hyounguk-shon
         project: noisy-label
-        name: CIFAR10-CE-NRD
+        name: CIFAR100-CE-NRD
         save_code: True
     
     trainer:
@@ -169,7 +169,7 @@ if __name__ == '__main__':
         batch_size: 128
         save_model: False
         loss_fn: cross_entropy
-        alpha: 0.4
+        alpha: 0.3
         teacher_aug: autoaugment_randomerasing
         student_aug: randomcrop
         distill_loss_fn: cross_entropy

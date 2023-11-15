@@ -142,20 +142,20 @@ if __name__ == '__main__':
     method: fit_nrosd
     
     data:
-        dataset: old_noisy_cifar10
+        dataset: old_noisy_cifar100
         noise_type: asymmetric
-        noise_rate: 0.2
+        noise_rate: 0.4
         random_seed: 42
 
     model:
         architecture: resnet34
-        num_classes: 10
+        num_classes: 100
     
     wandb:
         mode: online # "disabled" or "online"
         entity: hyounguk-shon
         project: noisy-label
-        name: CIFAR10-CE-NRD
+        name: CIFAR100-CE-NRD
         save_code: True
     
     trainer:
