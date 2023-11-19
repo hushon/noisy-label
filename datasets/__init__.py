@@ -117,6 +117,8 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
             if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N, OldNoisyCIFAR10, OldNoisyCIFAR100]:
                 return nn.Sequential(
                     transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.CIFAR10),
+                    transforms_v2.RandomCrop(32, padding=4),
+                    transforms_v2.RandomHorizontalFlip(),
                     transforms_v2.ToImageTensor(), # PIL.Image -> uint8
                 )
             elif dataset_type in [Clothing1M, WebVisionV1]:
@@ -181,6 +183,47 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
                     # transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
                     transforms_v2.ToImageTensor(), # PIL.Image -> uint8
                     transforms_v2.RandomErasing(1.0, [0.15, 0.15], [1.0, 1.0], 124),
+                )
+        case "gjs":
+            if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N, OldNoisyCIFAR10, OldNoisyCIFAR100]:
+                return nn.Sequential(
+                    transforms_v2.RandAugment(1, 3),
+                    transforms_v2.RandomCrop(32, padding=4),
+                    transforms_v2.RandomHorizontalFlip(),
+                    transforms_v2.ToImageTensor(), # PIL.Image -> uint8
+                    transforms_v2.RandomErasing(1.0, [0.5, 0.5], [1.0, 1.0], 124),
+                )
+            elif dataset_type in [Clothing1M, WebVisionV1]:
+                return nn.Sequential(
+                    transforms_v2.RandAugment(1, 3),
+                    transforms_v2.Resize(256, antialias=True),
+                    transforms_v2.CenterCrop(224),
+                    # transforms_v2.AutoAugment(transforms.AutoAugmentPolicy.IMAGENET),
+                    transforms_v2.ToImageTensor(), # PIL.Image -> uint8
+                    transforms_v2.RandomErasing(1.0, [0.15, 0.15], [1.0, 1.0], 124),
+                )
+        case "randaugment":
+            if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N, OldNoisyCIFAR10, OldNoisyCIFAR100]:
+                return nn.Sequential(
+                    transforms_v2.RandAugment(1, 3),
+                    transforms_v2.RandomCrop(32, padding=4),
+                    transforms_v2.RandomHorizontalFlip(),
+                    transforms_v2.ToImageTensor(), # PIL.Image -> uint8
+                )
+            elif dataset_type in [Clothing1M, WebVisionV1]:
+                return nn.Sequential(
+                    transforms_v2.RandAugment(1, 3),
+                    transforms_v2.Resize(256, antialias=True),
+                    transforms_v2.CenterCrop(224),
+                    transforms_v2.ToImageTensor(), # PIL.Image -> uint8
+                )
+        case "augmix":
+            if dataset_type in [CIFAR10, NoisyCIFAR10, NoisyCIFAR3, CIFAR10N, CIFAR100, NoisyCIFAR100, CIFAR100N, OldNoisyCIFAR10, OldNoisyCIFAR100]:
+                return nn.Sequential(
+                    transforms_v2.AugMix(),
+                    transforms_v2.RandomCrop(32, padding=4),
+                    transforms_v2.RandomHorizontalFlip(),
+                    transforms_v2.ToImageTensor(), # PIL.Image -> uint8
                 )
         case _:
             raise NotImplementedError(op_name)

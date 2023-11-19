@@ -248,35 +248,35 @@ if __name__ == '__main__':
             dataset: cifar10n
 
         model:
-            architecture: resnet34
+            architecture: preactresnet34
             num_classes: 10
         
         wandb:
             mode: online # "disabled" or "online"
             entity: hyounguk-shon
             project: noisy-label
-            name: CIFARN
+            name: CIFAR10N
             save_code: True
         
         trainer:
             optimizer: sgd
-            init_lr: 0.1
+            init_lr: 0.05
             momentum: 0.9
-            weight_decay: 1.0e-4
-            lr_scheduler: multistep
-            max_epoch: 200
+            weight_decay: 5.0e-4
+            lr_scheduler: multistep_gjs
+            max_epoch: 400
             num_workers: 4
             batch_size: 128
             save_model: False
             loss_fn: cross_entropy
             alpha: 0.4
             teacher_aug: autoaugment_randomerasing
-            student_aug: randomcrop
+            student_aug: autoaugment
             distill_loss_fn: cross_entropy
             temperature: 5.0
             enable_amp: False
             transform_after_batching: false
-            early_stop_epoch: 200
+            early_stop_epoch: 400
         """
         )
         for dataset, num_classes in zip(['cifar10n', 'cifar100n'], [10, 100]):

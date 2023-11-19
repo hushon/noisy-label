@@ -160,8 +160,10 @@ class L1DistillationLoss(nn.L1Loss):
     def forward(self, pred_logits, target_logits):
         x = pred_logits.div(self.temperature).softmax(-1)
         y = target_logits.div(self.temperature).softmax(-1)
+        # x = pred_logits.div(self.temperature)
+        # y = target_logits.div(self.temperature)
         if self.reduction == 'none':
-            loss = super().forward(x, y).sum(-1)
+            loss = super().forward(x, y).mean(-1)
         else:
             loss = super().forward(x, y)
         return loss * (self.temperature**2)

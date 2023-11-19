@@ -41,6 +41,7 @@ class Trainer:
                     lr=self.config["init_lr"],
                     momentum=self.config["momentum"],
                     weight_decay=self.config["weight_decay"],
+                    # nesterov=True,
                 )
             case "adam":
                 optimizer = torch.optim.Adam(
@@ -89,6 +90,12 @@ class Trainer:
                     milestones=[self.config["max_epoch"] // 2,],
                     gamma=0.1,
                 )
+            case "multistep_gjs":
+                lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                    optimizer,
+                    milestones=[200, 300],
+                    gamma=0.1,
+                )
             case _:
                 raise NotImplementedError(self.config["lr_scheduler"])
         return lr_scheduler
@@ -117,6 +124,8 @@ class Trainer:
                                     q=self.config["loss_param"]["q"],
                                     reduction="none",
                                     )
+            case "gjs":
+                fn = JensenShannonDivergenceWeightedScaled(self.config['pi'])
             case _:
                 raise NotImplementedError(fn_name)
         return fn
@@ -132,8 +141,6 @@ class Trainer:
                 fn = SmoothL1DistillationLoss(temperature, reduction="none")
             case "cross_entropy":
                 fn = CrossEntropyDistillationLoss(temperature, reduction="none")
-            case "gjs":
-                fn = JensenShannonDivergenceWeightedScaled('0.3 0.35 0.35')
             case _:
                 raise NotImplementedError(fn_name)
         return fn
@@ -322,7 +329,8 @@ class Trainer:
         train_dataloader = self.get_dataloader(train_dataset, train=True)
         val_dataloader = self.get_dataloader(val_dataset, train=False)
 
-        self.criterion = self.get_loss_fn(self.config["loss_fn"]).to(self.device)
+        self.criterion = self.get_loss_fn('cross_entropy').to(self.device)
+        distill_loss_fn = self.get_loss_fn(self.config["loss_fn"]).to(self.device)
         optimizer = self.get_optimizer(self.model)
         lr_scheduler = self.get_lr_scheduler(optimizer)
         grad_scaler = torch.cuda.amp.GradScaler(enabled=self.config["enable_amp"])
@@ -332,12 +340,6 @@ class Trainer:
             type='model',
             metadata=self.wandb_run.config['model']
         )
-
-        distill_criterion = self.get_distill_loss_fn(
-            self.config["distill_loss_fn"],
-            self.config['temperature']
-        ).to(self.device)
-        alpha = self.config['alpha']
 
         normalize = datasets.get_normalization(train_dataset).to(self.device)
 
@@ -349,7 +351,7 @@ class Trainer:
             train_stats = AverageMeter()
             self.model.train()
             for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
-                target = batch["target"].to(self.device)
+                target, target_gt = batch["target"].to(self.device), batch["target_gt"].to(self.device)
                 data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
                 if self.config['transform_after_batching']:
                     data, data2 = transform1(data), transform2(data2)
@@ -360,9 +362,10 @@ class Trainer:
                     with torch.no_grad():
                         # self.model.eval()
                         output_teacher = self.model(data2)
+                    # output_teacher = self.model(data2)
                     target_loss = torch.tensor(0.0)
-                    distill_loss = distill_criterion([output, output_teacher], target).mean()
-                    loss = target_loss * alpha + distill_loss * (1.0-alpha)
+                    distill_loss = distill_loss_fn([output, output_teacher], target).mean()
+                    loss = distill_loss
                 optimizer.zero_grad()
                 grad_scaler.scale(loss).backward()
                 grad_scaler.step(optimizer)
@@ -372,6 +375,8 @@ class Trainer:
                     loss=loss.detach(),
                     t1acc=calculate_accuracy(output, target),
                     t5acc=calculate_accuracy(output, target, k=5),
+                    teacher_gt_acc=calculate_accuracy(output_teacher, target_gt),
+                    student_gt_acc=calculate_accuracy(output, target_gt),
                     target_loss=target_loss.detach(),
                     distill_loss=distill_loss.detach()
                 )

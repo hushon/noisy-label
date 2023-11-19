@@ -34,7 +34,7 @@ def custom_kl_div(prediction, target):
     output_pos = target * (target.clamp(min=1e-7).log() - prediction)
     zeros = torch.zeros_like(output_pos)
     output = torch.where(target > 0, output_pos, zeros)
-    output = torch.sum(output, axis=1)
+    output = torch.sum(output, axis=-1)
     return output.mean()
 
 def custom_ce(prediction, target):
@@ -124,30 +124,50 @@ class JensenShannonDivergenceWeightedCustom(torch.nn.Module):
 
 class JensenShannonDivergenceWeightedScaled(torch.nn.Module):
     def __init__(self, weights):
-        super(JensenShannonDivergenceWeightedScaled, self).__init__()
-        self.weights = [float(w) for w in weights.split(' ')]
+        # super(JensenShannonDivergenceWeightedScaled, self).__init__()
+        # self.weights = [float(w) for w in weights.split(' ')]
         
-        self.scale = -1.0 / ((1.0-self.weights[0]) * np.log((1.0-self.weights[0])))
+        # self.scale = -1.0 / ((1.0-self.weights[0]) * np.log((1.0-self.weights[0])))
+        # assert abs(1.0 - sum(self.weights)) < 0.001
+        super(JensenShannonDivergenceWeightedScaled, self).__init__()
+        self.register_buffer('weights', torch.as_tensor(weights))
+        
+        scale = -1.0 / ((1.0-self.weights[0]) * np.log((1.0-self.weights[0])))
         assert abs(1.0 - sum(self.weights)) < 0.001
-    
+        self.register_buffer('scale', torch.as_tensor(scale))
+
+    # def forward(self, pred, labels):
+    #     num_classes = pred[0].size(-1)
+
+    #     preds = list()
+    #     if type(pred) == list:
+    #         for i, p in enumerate(pred):
+    #             preds.append(F.softmax(p, dim=1)) 
+    #     else:
+    #         preds.append(F.softmax(pred, dim=1))
+
+    #     labels = F.one_hot(labels, num_classes).float() 
+    #     distribs = [labels] + preds
+    #     assert len(self.weights) == len(distribs)
+
+    #     mean_distrib = sum([w*d for w,d in zip(self.weights, distribs)])
+    #     mean_distrib_log = mean_distrib.clamp(1e-7, 1.0).log()
+        
+    #     jsw = sum([w*custom_kl_div(mean_distrib_log, d) for w,d in zip(self.weights, distribs)])
+    #     return self.scale * jsw
+
     def forward(self, pred, labels):
         num_classes = pred[0].size(-1)
 
-        preds = list()
-        if type(pred) == list:
-            for i, p in enumerate(pred):
-                preds.append(F.softmax(p, dim=1)) 
-        else:
-            preds.append(F.softmax(pred, dim=1))
-
-        labels = F.one_hot(labels, num_classes).float() 
-        distribs = [labels] + preds
+        preds = torch.stack(pred, dim=0).softmax(-1)
+        labels = F.one_hot(labels, num_classes).float()
+        distribs = torch.cat([labels[None, ...], preds], dim=0)
         assert len(self.weights) == len(distribs)
 
-        mean_distrib = sum([w*d for w,d in zip(self.weights, distribs)])
+        mean_distrib = torch.sum(self.weights[:, None, None] * distribs, dim=0)
         mean_distrib_log = mean_distrib.clamp(1e-7, 1.0).log()
         
-        jsw = sum([w*custom_kl_div(mean_distrib_log, d) for w,d in zip(self.weights, distribs)])
+        jsw = torch.sum(self.weights[:, None, None] * custom_kl_div(mean_distrib_log[None, :].expand_as(distribs), distribs), dim=0)
         return self.scale * jsw
 
 
