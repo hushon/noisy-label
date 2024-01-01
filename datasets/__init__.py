@@ -225,6 +225,38 @@ def get_transform(op_name: str, dataset: Dataset) -> nn.Module:
                     transforms_v2.RandomHorizontalFlip(),
                     transforms_v2.ToImageTensor(), # PIL.Image -> uint8
                 )
+            elif dataset_type in [WebVisionV1]:
+                # return nn.Sequential(
+                #     transforms_v2.AugMix(),
+                #     transforms_v2.Resize(256, antialias=True),
+                #     transforms_v2.CenterCrop(224),
+                #     transforms_v2.ToImageTensor(), # PIL.Image -> uint8
+                # )
+                return nn.Sequential(
+                    transforms_v2.RandomResizedCrop(224),
+                    transforms_v2.RandomHorizontalFlip(),
+                    transforms_v2.AugMix(),
+                    transforms_v2.ToImageTensor(), # PIL.Image -> uint8
+                )
+        case "gjs_webvision_weak":
+            if dataset_type in [WebVisionV1]:
+                return nn.Sequential(
+                    transforms_v2.RandomResizedCrop(224),
+                    transforms_v2.RandomHorizontalFlip(),
+                    transforms_v2.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.2),
+                    transforms_v2.ToImageTensor(), # PIL.Image -> uint8
+                )
+        case "augmix_colorjitter":
+            if dataset_type in [WebVisionV1]:
+                return nn.Sequential(
+                    transforms_v2.RandomResizedCrop(224),
+                    transforms_v2.RandomHorizontalFlip(),
+                    transforms_v2.AugMix(),
+                    transforms_v2.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.2),
+                    transforms_v2.ToImageTensor(), # PIL.Image -> uint8
+                )
+            else:
+                raise NotImplementedError(dataset_type)
         case _:
             raise NotImplementedError(op_name)
 
@@ -274,3 +306,21 @@ class _RepeatSampler(object):
     def __iter__(self):
         while True:
             yield from iter(self.sampler)
+
+
+class MultiTransformDataset(Dataset):
+
+    def __init__(self, dataset: Dataset, transforms: list = None):
+        super().__init__()
+        self.dataset = dataset
+        self.transforms = transforms
+
+    def __getitem__(self, index):
+        sample = self.dataset[index]
+        image = sample.pop('image')
+        images = [t(image) for t in self.transforms]
+        sample['image'] = images
+        return sample
+
+    def __len__(self):
+        return len(self.dataset)

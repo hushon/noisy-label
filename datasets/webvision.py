@@ -123,7 +123,8 @@ class WebVisionV1(torch.utils.data.Dataset):
         output = {
             'image': image1,
             'target': target,
-        }# No target_gt: real-world noisy dataset. # TODO: clean key_list..?
+            'target_gt': target, # No target_gt: real-world noisy dataset. # TODO: clean key_list..?
+        }
         if self.transform2 is not None:
             output.update({
                 'image2': self.transform2(image),

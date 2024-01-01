@@ -8,7 +8,7 @@ from .module import MCDropout, GaussianDropout, GaussianMCDropout, \
     GeneralizedCrossEntropyLoss, CrossEntropyDistillationLoss, \
     Normalize2D
 import torchvision
-from .gjs_losses import JensenShannonDivergenceWeightedScaled
+from .gjs_losses import JensenShannonDivergenceWeightedScaled, JensenShannonDivergenceWeightedCustom
 
 
 def get_model(architecture, num_classes, pretrained=False) -> nn.Module:

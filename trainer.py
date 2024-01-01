@@ -8,7 +8,7 @@ import wandb
 from wandb.sdk.wandb_run import Run
 import pdb
 from models import MeanAbsoluteError, ReverseCrossEntropyLoss, SymmetricCrossEntropyLoss, \
-    GeneralizedCrossEntropyLoss, CrossEntropyDistillationLoss, JensenShannonDivergenceWeightedScaled
+    GeneralizedCrossEntropyLoss, CrossEntropyDistillationLoss, JensenShannonDivergenceWeightedScaled, JensenShannonDivergenceWeightedCustom
 from models import KLDivDistillationLoss, L1DistillationLoss, SmoothL1DistillationLoss, Normalize2D
 import torchvision
 torchvision.disable_beta_transforms_warning()
@@ -41,7 +41,7 @@ class Trainer:
                     lr=self.config["init_lr"],
                     momentum=self.config["momentum"],
                     weight_decay=self.config["weight_decay"],
-                    # nesterov=True,
+                    nesterov=True,
                 )
             case "adam":
                 optimizer = torch.optim.Adam(
@@ -96,6 +96,12 @@ class Trainer:
                     milestones=[200, 300],
                     gamma=0.1,
                 )
+            case "steplr_gjs_webvision":
+                lr_scheduler = torch.optim.lr_scheduler.StepLR(
+                    optimizer,
+                    step_size=1,
+                    gamma=0.97,
+                )
             case _:
                 raise NotImplementedError(self.config["lr_scheduler"])
         return lr_scheduler
@@ -126,6 +132,8 @@ class Trainer:
                                     )
             case "gjs":
                 fn = JensenShannonDivergenceWeightedScaled(self.config['pi'])
+            case "gjs_jswc":
+                fn = JensenShannonDivergenceWeightedCustom(self.config['pi'])
             case _:
                 raise NotImplementedError(fn_name)
         return fn

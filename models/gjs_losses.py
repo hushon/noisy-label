@@ -98,13 +98,13 @@ class JSDissect(torch.nn.Module):
 
 
 class JensenShannonDivergenceWeightedCustom(torch.nn.Module):
-    def __init__(self, num_classes, weights):
+    def __init__(self, weights):
         super(JensenShannonDivergenceWeightedCustom, self).__init__()
-        self.num_classes = num_classes
-        self.weights = [float(w) for w in weights.split(' ')]
+        self.weights = weights
         assert abs(1.0 - sum(self.weights)) < 0.001
     
     def forward(self, pred, labels):
+        num_classes = pred[0].size(-1)
         preds = list()
         if type(pred) == list:
             for i, p in enumerate(pred):
@@ -112,7 +112,7 @@ class JensenShannonDivergenceWeightedCustom(torch.nn.Module):
         else:
             preds.append(F.softmax(pred, dim=1))
 
-        labels = F.one_hot(labels, self.num_classes).float() 
+        labels = F.one_hot(labels, num_classes).float() 
         distribs = [labels] + preds
         assert len(self.weights) == len(distribs)
 
@@ -169,7 +169,33 @@ class JensenShannonDivergenceWeightedScaled(torch.nn.Module):
         
         jsw = torch.sum(self.weights[:, None, None] * custom_kl_div(mean_distrib_log[None, :].expand_as(distribs), distribs), dim=0)
         return self.scale * jsw
+# class JensenShannonDivergenceWeightedScaled(torch.nn.Module):
+#     def __init__(self, weights):
+#         super(JensenShannonDivergenceWeightedScaled, self).__init__()
+#         self.weights = weights
+        
+#         self.scale = -1.0 / ((1.0-self.weights[0]) * np.log((1.0-self.weights[0])))
+#         assert abs(1.0 - sum(self.weights)) < 0.001
 
+#     def forward(self, pred, labels):
+#         num_classes = pred[0].size(-1)
+
+#         preds = list()
+#         if type(pred) == list:
+#             for i, p in enumerate(pred):
+#                 preds.append(F.softmax(p, dim=1)) 
+#         else:
+#             preds.append(F.softmax(pred, dim=1))
+
+#         labels = F.one_hot(labels, num_classes).float() 
+#         distribs = [labels] + preds
+#         assert len(self.weights) == len(distribs)
+
+#         mean_distrib = sum([w*d for w,d in zip(self.weights, distribs)])
+#         mean_distrib_log = mean_distrib.clamp(1e-7, 1.0).log()
+        
+#         jsw = sum([w*custom_kl_div(mean_distrib_log, d) for w,d in zip(self.weights, distribs)])
+#         return self.scale * jsw
 
 class JensenShannonNoConsistency(torch.nn.Module):
     def __init__(self, num_classes, weights):
