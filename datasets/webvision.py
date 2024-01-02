@@ -115,20 +115,13 @@ class WebVisionV1(torch.utils.data.Dataset):
         target = torch.tensor(target)
 
         if self.transform is not None:
-            image1 = self.transform(image)
-
-        if self.target_transform is not None:
-            target = self.target_transform(target)
+            image = self.transform(image)
 
         output = {
-            'image': image1,
+            'image': image,
             'target': target,
             'target_gt': target, # No target_gt: real-world noisy dataset. # TODO: clean key_list..?
         }
-        if self.transform2 is not None:
-            output.update({
-                'image2': self.transform2(image),
-            })
         return output
 
 

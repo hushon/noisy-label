@@ -324,13 +324,16 @@ class Trainer:
 
     def fit_nrosd_gjs(self, train_dataset: Dataset, val_dataset: Dataset):
         if self.config['transform_after_batching']:
-            train_dataset.transform = datasets.get_transform('none', train_dataset)
-            train_dataset.transform2 = datasets.get_transform('none', train_dataset)
-            transform1 = datasets.get_transform(self.config['student_aug'], train_dataset)
-            transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+            raise ValueError
         else:
-            train_dataset.transform = datasets.get_transform(self.config['student_aug'], train_dataset)
-            train_dataset.transform2 = datasets.get_transform(self.config['teacher_aug'], train_dataset)
+            train_transforms = [
+                datasets.get_transform(self.config['student_aug'], train_dataset),
+                datasets.get_transform(self.config['student_aug'], train_dataset),
+                datasets.get_transform(self.config['teacher_aug'], train_dataset),
+            ]
+
+        from datasets import MultiTransformDataset
+        train_dataset = MultiTransformDataset(train_dataset, train_transforms)
 
         val_dataset.transform = datasets.get_transform('none', val_dataset)
 
@@ -349,7 +352,7 @@ class Trainer:
             metadata=self.wandb_run.config['model']
         )
 
-        normalize = datasets.get_normalization(train_dataset).to(self.device)
+        normalize = datasets.get_normalization(train_dataset.dataset).to(self.device)
 
         val_t1acc_best = 0.0
 
@@ -360,19 +363,13 @@ class Trainer:
             self.model.train()
             for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
                 target, target_gt = batch["target"].to(self.device), batch["target_gt"].to(self.device)
-                data, data2 = batch["image"].to(self.device), batch['image2'].to(self.device)
-                if self.config['transform_after_batching']:
-                    data, data2 = transform1(data), transform2(data2)
-                data, data2 = normalize(data), normalize(data2)
+                batch["image"] = [normalize(x.to(self.device)) for x in batch["image"]]
                 with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
                     # self.model.train()
-                    output = self.model(data)
-                    with torch.no_grad():
-                        # self.model.eval()
-                        output_teacher = self.model(data2)
-                    # output_teacher = self.model(data2)
+                    outputs = [self.model(x) for x in batch["image"]]
+                    outputs[-1] = outputs[-1].detach()
                     target_loss = torch.tensor(0.0)
-                    distill_loss = distill_loss_fn([output, output_teacher], target).mean()
+                    distill_loss = distill_loss_fn([*outputs], target).mean()
                     loss = distill_loss
                 optimizer.zero_grad()
                 grad_scaler.scale(loss).backward()
@@ -381,10 +378,10 @@ class Trainer:
                 train_stats.update(
                     target.size(0),
                     loss=loss.detach(),
-                    t1acc=calculate_accuracy(output, target),
-                    t5acc=calculate_accuracy(output, target, k=5),
-                    teacher_gt_acc=calculate_accuracy(output_teacher, target_gt),
-                    student_gt_acc=calculate_accuracy(output, target_gt),
+                    t1acc=calculate_accuracy(outputs[0], target),
+                    t5acc=calculate_accuracy(outputs[0], target, k=5),
+                    teacher_gt_acc=calculate_accuracy(outputs[-1], target_gt),
+                    student_gt_acc=calculate_accuracy(outputs[0], target_gt),
                     target_loss=target_loss.detach(),
                     distill_loss=distill_loss.detach()
                 )

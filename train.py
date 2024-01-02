@@ -345,11 +345,11 @@ if __name__ == '__main__':
         batch_size: 32
         save_model: False
         loss_fn: gjs_jswc
-        pi: [0.1, 0.75, 0.15]
-        # teacher_aug: augmix
-        # student_aug: autoaugment
+        pi: [0.1, 0.4, 0.4, 0.1]
         teacher_aug: augmix
-        student_aug: augmix_colorjitter
+        # student_aug: autoaugment
+        # teacher_aug: augmix_colorjitter
+        student_aug: gjs_webvision_weak
         enable_amp: true
         transform_after_batching: false
         early_stop_epoch: 300
