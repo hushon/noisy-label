@@ -310,16 +310,14 @@ class _RepeatSampler(object):
 
 class MultiTransformDataset(Dataset):
 
-    def __init__(self, dataset: Dataset, transforms: list = None):
+    def __init__(self, dataset: Dataset, transforms: list):
         super().__init__()
         self.dataset = dataset
         self.transforms = transforms
 
     def __getitem__(self, index):
         sample = self.dataset[index]
-        image = sample.pop('image')
-        images = [t(image) for t in self.transforms]
-        sample['image'] = images
+        sample['image'] = [t(sample["image"]) for t in self.transforms]
         return sample
 
     def __len__(self):

@@ -330,19 +330,19 @@ if __name__ == '__main__':
         mode: online # "disabled" or "online"
         entity: hyounguk-shon
         project: noisy-label
-        name: WebVision-augmix-colorjitter
+        name: WebVision-augmix
         save_code: True
     
     trainer:
         optimizer: sgd
-        init_lr: 0.1
+        init_lr: 0.4
         momentum: 0.9
         weight_decay: 1.0e-4
         lr_scheduler: steplr_gjs_webvision
         # lr_scheduler: cosine
         max_epoch: 300
         num_workers: 16
-        batch_size: 32
+        batch_size: 128
         save_model: False
         loss_fn: gjs_jswc
         pi: [0.1, 0.4, 0.4, 0.1]

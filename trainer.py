@@ -91,9 +91,11 @@ class Trainer:
                     gamma=0.1,
                 )
             case "multistep_gjs":
+                # total 400 ep. decay at 200, 300
+                max_ep = self.config["max_epoch"]
                 lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
                     optimizer,
-                    milestones=[200, 300],
+                    milestones=[int(0.5*max_ep), int(0.75*max_ep)],
                     gamma=0.1,
                 )
             case "steplr_gjs_webvision":
@@ -101,6 +103,14 @@ class Trainer:
                     optimizer,
                     step_size=1,
                     gamma=0.97,
+                )
+            case "multistep_gjs_overfit":
+                # total 1000 ep. decay at 400, 800
+                max_ep = self.config["max_epoch"]
+                lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                    optimizer,
+                    milestones=[int(0.3*max_ep), int(0.8*max_ep)],
+                    gamma=0.1,
                 )
             case _:
                 raise NotImplementedError(self.config["lr_scheduler"])
@@ -322,6 +332,89 @@ class Trainer:
                 artifact.add_file(filepath)
         self.wandb_run.log_artifact(artifact)
 
+    def fit_gjs(self, train_dataset: Dataset, val_dataset: Dataset):
+        if self.config['transform_after_batching']:
+            raise ValueError
+        else:
+            train_transforms = [
+                datasets.get_transform(self.config['student_aug'], train_dataset),
+                datasets.get_transform(self.config['teacher_aug'], train_dataset),
+            ]
+
+        from datasets import MultiTransformDataset
+        train_dataset = MultiTransformDataset(train_dataset, train_transforms)
+
+        val_dataset.transform = datasets.get_transform('none', val_dataset)
+
+        train_dataloader = self.get_dataloader(train_dataset, train=True)
+        val_dataloader = self.get_dataloader(val_dataset, train=False)
+
+        self.criterion = self.get_loss_fn('cross_entropy').to(self.device)
+        assert self.config['loss_fn'] in ['gjs', 'gjs_jswc']
+        distill_loss_fn = self.get_loss_fn(self.config["loss_fn"]).to(self.device)
+        optimizer = self.get_optimizer(self.model)
+        lr_scheduler = self.get_lr_scheduler(optimizer)
+        grad_scaler = torch.cuda.amp.GradScaler(enabled=self.config["enable_amp"])
+        # artifact = wandb.Artifact(f'checkpoints_{self.wandb_run.id}',
+        artifact = wandb.Artifact(
+            'checkpoints',
+            type='model',
+            metadata=self.wandb_run.config['model']
+        )
+
+        normalize = datasets.get_normalization(train_dataset.dataset).to(self.device)
+
+        val_t1acc_best = 0.0
+
+        for epoch in tqdm.trange(self.config["max_epoch"], dynamic_ncols=True, position=0):
+            if epoch == self.config['early_stop_epoch']: # use early stopping
+                break
+            train_stats = AverageMeter()
+            self.model.train()
+            for batch in tqdm.tqdm(train_dataloader, desc=f'Ep {epoch}', dynamic_ncols=True, leave=False, position=1):
+                target, target_gt = batch["target"].to(self.device), batch["target_gt"].to(self.device)
+                batch["image"] = [normalize(x.to(self.device)) for x in batch["image"]]
+                with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
+                    outputs = [self.model(x) for x in batch["image"]]
+                    target_loss = torch.tensor(0.0)
+                    distill_loss = distill_loss_fn([*outputs], target).mean()
+                    loss = distill_loss
+                optimizer.zero_grad()
+                grad_scaler.scale(loss).backward()
+                grad_scaler.step(optimizer)
+                grad_scaler.update()
+                train_stats.update(
+                    target.size(0),
+                    loss=loss.detach(),
+                    t1acc=calculate_accuracy(outputs[0], target),
+                    t5acc=calculate_accuracy(outputs[0], target, k=5),
+                    teacher_gt_acc=calculate_accuracy(outputs[-1], target_gt),
+                    student_gt_acc=calculate_accuracy(outputs[0], target_gt),
+                    target_loss=target_loss.detach(),
+                    distill_loss=distill_loss.detach()
+                )
+            lr_scheduler.step()
+
+            train_stats = train_stats.get_average()
+            val_stats = self._evaluate(val_dataloader)
+            if val_stats['t1acc'] > val_t1acc_best: # update best t1acc
+                val_t1acc_best = val_stats['t1acc']
+            tqdm.tqdm.write(f"Ep {epoch}\tTrain Loss: {train_stats['loss']:.4f}, Train Acc: {train_stats['t1acc']:.2f}, Val Loss: {val_stats['loss']:.4f}, Val Acc: {val_stats['t1acc']:.2f}")
+            self.wandb_run.log(
+                {
+                    "learning_rate": lr_scheduler.get_last_lr()[0],
+                    **{'train_'+k: v for k, v in train_stats.items()},
+                    **{'val_'+k: v for k, v in val_stats.items()},
+                    'val_t1acc_best': val_t1acc_best,
+                }
+            )
+            if self.config["save_model"] and (epoch+1)%10 == 0:
+                filepath = os.path.join(self.wandb_run.dir, f"model_{epoch}.pth")
+                torch.save(self.model.state_dict(), filepath)
+                print(f"SAVED MODEL")
+                artifact.add_file(filepath)
+        self.wandb_run.log_artifact(artifact)
+
     def fit_nrosd_gjs(self, train_dataset: Dataset, val_dataset: Dataset):
         if self.config['transform_after_batching']:
             raise ValueError
@@ -366,7 +459,15 @@ class Trainer:
                 batch["image"] = [normalize(x.to(self.device)) for x in batch["image"]]
                 with torch.cuda.amp.autocast(enabled=self.config["enable_amp"]):
                     # self.model.train()
-                    outputs = [self.model(x) for x in batch["image"]]
+                    # outputs = [self.model(x) for x in batch["image"]]
+                    input1 = torch.cat(batch["image"][:-1], dim=0)
+                    outputs1 = self.model(input1)
+                    with torch.no_grad():
+                        self.model.eval()
+                        outputs2 = self.model(batch["image"][-1])
+                        self.model.train()
+                    outputs = torch.cat([outputs1, outputs2], dim=0)
+                    outputs = list(torch.chunk(outputs, len(batch["image"]), dim=0))
                     outputs[-1] = outputs[-1].detach()
                     target_loss = torch.tensor(0.0)
                     distill_loss = distill_loss_fn([*outputs], target).mean()
@@ -406,6 +507,7 @@ class Trainer:
                 print(f"SAVED MODEL")
                 artifact.add_file(filepath)
         self.wandb_run.log_artifact(artifact)
+
 
     def fit_nrosd_ema(self, train_dataset: Dataset, val_dataset: Dataset):
         from ema_pytorch import EMA

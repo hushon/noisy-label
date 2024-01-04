@@ -35,7 +35,8 @@ def custom_kl_div(prediction, target):
     zeros = torch.zeros_like(output_pos)
     output = torch.where(target > 0, output_pos, zeros)
     output = torch.sum(output, axis=-1)
-    return output.mean()
+    # return output.mean()
+    return output
 
 def custom_ce(prediction, target):
     output_pos = -target * prediction
@@ -166,9 +167,22 @@ class JensenShannonDivergenceWeightedScaled(torch.nn.Module):
 
         mean_distrib = torch.sum(self.weights[:, None, None] * distribs, dim=0)
         mean_distrib_log = mean_distrib.clamp(1e-7, 1.0).log()
-        
-        jsw = torch.sum(self.weights[:, None, None] * custom_kl_div(mean_distrib_log[None, :].expand_as(distribs), distribs), dim=0)
+
+        jsw = torch.sum(self.weights[:, None] * custom_kl_div(mean_distrib_log[None, :, :].expand_as(distribs), distribs), dim=0)
         return self.scale * jsw
+    # def forward(self, pred, labels):
+    #     num_classes = pred[0].size(-1)
+
+    #     preds = [p.softmax(-1) for p in pred]
+    #     labels = F.one_hot(labels, num_classes).float()
+    #     distribs = [labels] + preds
+    #     assert len(self.weights) == len(distribs)
+
+    #     mean_distrib = sum([w*d for w,d in zip(self.weights, distribs)])
+    #     mean_distrib_log = mean_distrib.clamp(1e-7, 1.0).log()
+        
+    #     jsw = sum([w*custom_kl_div(mean_distrib_log, d) for w,d in zip(self.weights, distribs)])
+    #     return self.scale * jsw
 # class JensenShannonDivergenceWeightedScaled(torch.nn.Module):
 #     def __init__(self, weights):
 #         super(JensenShannonDivergenceWeightedScaled, self).__init__()

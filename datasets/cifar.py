@@ -69,19 +69,17 @@ class CIFAR100(torchvision.datasets.CIFAR100):
         img = Image.fromarray(img)
 
         if self.transform is not None:
-            img1 = self.transform(img)
+            img = self.transform(img)
 
         if self.target_transform is not None:
             target = self.target_transform(target)
 
         output = {
-            'image': img1,
+            'image': img,
             'target': target,
         }
         if hasattr(self, 'targets_gt'):
             output.update({'target_gt': self.targets_gt[index]})
-        if self.transform2 is not None:
-            output.update({'image2': self.transform2(img)})
         return output
 
 
